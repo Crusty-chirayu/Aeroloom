@@ -144,6 +144,14 @@ export async function runFpsProbe(durationMs: number = 1000): Promise<number> {
 }
 
 /**
+ * Check if the user has requested reduced motion for accessibility
+ */
+export function isReducedMotionPreferred(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
  * Resolve device tier with override support and hardware probe
  */
 export async function resolveDeviceTier(): Promise<TierConfig> {
@@ -157,6 +165,14 @@ export async function resolveDeviceTier(): Promise<TierConfig> {
 
   if (typeof window === 'undefined') {
     return TIER_CONFIGS.reduced;
+  }
+
+  // Accessibility: respect reduced motion preferences
+  if (isReducedMotionPreferred()) {
+    return {
+      ...TIER_CONFIGS.reduced,
+      reason: 'Accessibility preference: prefers-reduced-motion detected (calmed motion)',
+    };
   }
 
   const webGL = isWebGLAvailable();

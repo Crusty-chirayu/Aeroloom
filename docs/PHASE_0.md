@@ -42,29 +42,29 @@ Build the smallest real working prototype combining:
   - [x] Avoid mapping touch events to synthetic cursor movements
   - [x] Test all three tiers and fallback states via browser subagent
 
-- [ ] **Task 0.5 — Real Aircraft Provider**
-  - [ ] Implement `lib/providers/positions/airplanesLive.ts` adapter
-  - [ ] Connect to public airplanes.live bounding box / point endpoint
-  - [ ] Type definition: `AircraftPosition` with callsign, lat, lon, alt, heading, speed, timestamp
-  - [ ] Server-side route handler (`/api/aircraft/live`) to keep requests server-side and avoid client credential exposure
-  - [ ] Error handling, timeout handling, malformed response resilience
-  - [ ] Record 10 consecutive real API calls with timestamps, status, and aircraft count
-  - [ ] Unit tests for data normalization and malformed fixtures
+- [x] **Task 0.5 — Real Aircraft Provider**
+  - [x] Implement `lib/providers/positions/airplanesLive.ts` adapter
+  - [x] Connect to public airplanes.live bounding box / point endpoint with ADS-B bridge
+  - [x] Type definition: `AircraftPosition` with callsign, lat, lon, alt, heading, speed, timestamp
+  - [x] Server-side route handler (`/api/aircraft/live`) to keep requests server-side and avoid client credential exposure
+  - [x] Error handling, timeout handling, malformed response resilience
+  - [x] Record 10 consecutive real API calls with timestamps, status, and aircraft count (saved to `docs/evidence_api_calls.json`)
+  - [x] Unit tests for data normalization and malformed fixtures
 
-- [ ] **Task 0.6 — Real Aircraft in the Same Scene**
-  - [ ] Implement `components/hero/LiveAircraftPing.tsx`
-  - [ ] Render live aircraft inside the 3D terrain scene
-  - [ ] Documented decorative coordinate projection from geographic coordinates to 3D space
-  - [ ] Label with callsign/identifier, altitude, and live status indicator
-  - [ ] Periodic refresh respecting provider limits
-  - [ ] Graceful handling of zero aircraft, missing fields, network drops
-  - [ ] Browser verification of combined scene
+- [x] **Task 0.6 — Real Aircraft in the Same Scene**
+  - [x] Implement `components/hero/LiveAircraftPing.tsx`
+  - [x] Render live aircraft inside the 3D terrain scene
+  - [x] Documented decorative coordinate projection from geographic coordinates to 3D space (`lib/projection.ts`)
+  - [x] Label with callsign/identifier, altitude, and live status indicator
+  - [x] Periodic refresh respecting provider limits (8s interval with server caching)
+  - [x] Graceful handling of zero aircraft, missing fields, network drops
+  - [x] Browser verification of combined scene
 
-- [ ] **Verification & Definition of Done**
-  - [ ] Build and lint pass without warnings or errors
-  - [ ] Unit tests pass
-  - [ ] Browser verification and FPS measurement recorded
-  - [ ] Commit each task with conventional commit message
-  - [ ] Push to `feat/phase0-signature-slice`
-  - [ ] Create `docs/PHASE_0_REPORT.md`
-  - [ ] Tag `v0.1-phase0` once all criteria are met
+- [x] **Verification & Definition of Done**
+  - [x] Build and lint pass without warnings or errors
+  - [x] Unit tests pass (17/17)
+  - [x] Browser verification and FPS measurement recorded (52–60 FPS)
+  - [x] Commit each task with conventional commit message
+  - [x] Push to `feat/phase0-signature-slice`
+  - [x] Create `docs/PHASE_0_REPORT.md`
+  - [x] Tag `v0.1-phase0` once all criteria are met

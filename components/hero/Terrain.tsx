@@ -17,7 +17,7 @@ interface DottedMeshProps {
 function DottedMesh({ gridX, gridZ, onFpsUpdate, onUniformsUpdate }: DottedMeshProps) {
   const pointsRef = useRef<THREE.Points>(null);
   const materialRef = useRef<THREE.ShaderMaterial>(null);
-  const { raycaster, camera, pointer } = useThree();
+  const { raycaster, pointer } = useThree();
 
   // Internal cursor damping state
   const targetCursor = useRef(new THREE.Vector3(0, 0, 0));
@@ -32,7 +32,7 @@ function DottedMesh({ gridX, gridZ, onFpsUpdate, onUniformsUpdate }: DottedMeshP
 
   // Performance tracking
   const frameCount = useRef(0);
-  const lastFpsTime = useRef(performance.now());
+  const lastFpsTime = useRef(0);
 
   // Generate buffer geometry positions (GPU points)
   const positions = useMemo(() => {
@@ -83,7 +83,7 @@ function DottedMesh({ gridX, gridZ, onFpsUpdate, onUniformsUpdate }: DottedMeshP
 
   useFrame((state, delta) => {
     // 1. Raycast cursor against ground plane
-    raycaster.setFromCamera(pointer, camera);
+    raycaster.setFromCamera(pointer, state.camera);
     const hit = raycaster.ray.intersectPlane(groundPlane, intersectionPoint);
     if (hit) {
       targetCursor.current.copy(intersectionPoint);
@@ -111,13 +111,15 @@ function DottedMesh({ gridX, gridZ, onFpsUpdate, onUniformsUpdate }: DottedMeshP
     }
 
     // 4. Subtle camera sway for parallax depth
-    camera.position.x = Math.sin(state.clock.getElapsedTime() * 0.15) * 0.8;
-    camera.lookAt(0, 0, 0);
+    state.camera.position.x = Math.sin(state.clock.getElapsedTime() * 0.15) * 0.8;
+    state.camera.lookAt(0, 0, 0);
 
     // 5. FPS calculation
     frameCount.current++;
     const now = performance.now();
-    if (now - lastFpsTime.current >= 500) {
+    if (lastFpsTime.current === 0) {
+      lastFpsTime.current = now;
+    } else if (now - lastFpsTime.current >= 500) {
       const calculatedFps = Math.round((frameCount.current * 1000) / (now - lastFpsTime.current));
       onFpsUpdate?.(calculatedFps);
       onUniformsUpdate?.(currentIntensity.current, currentCursor.current);
@@ -175,8 +177,27 @@ export default function Terrain({ children }: TerrainProps) {
   }, []);
 
   useEffect(() => {
-    initTier();
-  }, [initTier]);
+    let mounted = true;
+    void (async () => {
+      try {
+        const config = await resolveDeviceTier();
+        if (mounted) {
+          setTierConfig(config);
+          if (typeof window !== 'undefined') {
+            const stored = localStorage.getItem('aeroloom_tier_override') as DeviceTier | null;
+            setOverrideState(stored);
+          }
+        }
+      } catch {
+        if (mounted) {
+          setTierConfig(TIER_CONFIGS.reduced);
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleFpsUpdate = useCallback((fps: number) => {
     setCurrentFps(fps);

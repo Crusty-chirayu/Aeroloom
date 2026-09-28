@@ -2,11 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import Terrain from '@/components/hero/Terrain';
+import LiveAircraftPing from '@/components/hero/LiveAircraftPing';
+import type { AircraftPosition } from '@/lib/providers/positions/types';
 import { Search, Radio, Compass, Plane, ShieldCheck, Activity } from 'lucide-react';
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [utcTime, setUtcTime] = useState<string>('');
+  const [selectedAircraft, setSelectedAircraft] = useState<AircraftPosition | null>(null);
 
   useEffect(() => {
     const updateTime = () => {
@@ -90,9 +93,62 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 3D Scene Container */}
+        {/* 3D Scene Container with Terrain and Live Aircraft Ping */}
         <section className="relative w-full">
-          <Terrain />
+          <Terrain>
+            <LiveAircraftPing
+              selectedCallsign={searchQuery}
+              onAircraftSelect={setSelectedAircraft}
+            />
+          </Terrain>
+
+          {/* Active Flight Detail Overlay Card */}
+          {selectedAircraft && (
+            <div className="mt-3 p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 backdrop-blur-md flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400">
+                  <Plane className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-white text-sm">{selectedAircraft.callsign}</span>
+                    {selectedAircraft.registration && (
+                      <span className="text-slate-400 text-[10px]">({selectedAircraft.registration})</span>
+                    )}
+                    <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold border border-emerald-500/30">
+                      LIVE TRACKED
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-400">
+                    Type: {selectedAircraft.aircraftType || 'Generic'} &bull; Hex: {selectedAircraft.id.toUpperCase()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 text-[11px]">
+                <div>
+                  <span className="text-slate-500 block text-[9px] uppercase">Altitude</span>
+                  <span className="text-sky-300 font-semibold">
+                    {selectedAircraft.isGround ? 'GROUND' : `${selectedAircraft.altitude.toLocaleString()} FT`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[9px] uppercase">Ground Speed</span>
+                  <span className="text-slate-200 font-semibold">{selectedAircraft.speed.toFixed(0)} KTS</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[9px] uppercase">Heading</span>
+                  <span className="text-slate-200 font-semibold">{selectedAircraft.heading.toFixed(0)}&deg;</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[9px] uppercase">Coordinates</span>
+                  <span className="text-slate-300 font-semibold">
+                    {selectedAircraft.latitude.toFixed(4)}, {selectedAircraft.longitude.toFixed(4)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Radar Telemetry Information Strip */}
