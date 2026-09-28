@@ -29,6 +29,7 @@ interface FlightMapProps {
   activeSector?: AviationSector;
   onSectorChange?: (sector: AviationSector) => void;
   onMetricsChange?: (metrics: MapMetrics) => void;
+  onMapReady?: (map: MapLibreMap) => void;
   children?: (map: MapLibreMap | null) => React.ReactNode;
 }
 
@@ -36,6 +37,7 @@ export default function FlightMap({
   activeSector = MAP_DEFAULTS.initialSector,
   onSectorChange,
   onMetricsChange,
+  onMapReady,
   children,
 }: FlightMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,6 +137,11 @@ export default function FlightMap({
         setIsLoading(false);
         setIsMapReady(true);
         updateMetrics();
+        if (typeof window !== 'undefined') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window as any).__aeroloomMap = map;
+        }
+        onMapReady?.(map);
       };
 
       map.on('load', handleReady);

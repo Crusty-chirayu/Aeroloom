@@ -7,9 +7,12 @@ import {
 } from '@/lib/providers/positions/airplanesLive';
 import type { ProviderResponse } from '@/lib/providers/positions/types';
 
-// Rate limiting and server-side cache (minimum 5s cache to respect public API rate limits)
-let cachedResponse: ProviderResponse | null = null;
-let lastFetchTime = 0;
+// Rate limiting and server-side cache (minimum 6s cache to respect public API rate limits)
+interface CacheEntry {
+  response: ProviderResponse;
+  timestamp: number;
+}
+const queryCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 6000; // 6 seconds
 
 export async function GET(request: NextRequest) {
@@ -19,15 +22,17 @@ export async function GET(request: NextRequest) {
   const lon = parseFloat(searchParams.get('lon') || '') || DEFAULT_QUERY_LOCATION.lon;
   const radiusNm = parseFloat(searchParams.get('radius') || '') || DEFAULT_QUERY_LOCATION.radiusNm;
 
+  const cacheKey = `${providerParam || 'auto'}_${lat.toFixed(2)}_${lon.toFixed(2)}_${radiusNm.toFixed(0)}`;
   const now = Date.now();
+  const cached = queryCache.get(cacheKey);
 
-  // If cache is fresh and query parameters match default, return cached response
-  if (!providerParam && cachedResponse && now - lastFetchTime < CACHE_TTL_MS) {
+  // If cache is fresh, return cached response
+  if (cached && now - cached.timestamp < CACHE_TTL_MS) {
     return NextResponse.json(
       {
-        ...cachedResponse,
+        ...cached.response,
         cached: true,
-        cacheAgeMs: now - lastFetchTime,
+        cacheAgeMs: now - cached.timestamp,
       },
       {
         headers: {
@@ -48,8 +53,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (result.success) {
-    cachedResponse = result;
-    lastFetchTime = now;
+    queryCache.set(cacheKey, { response: result, timestamp: now });
   }
 
   return NextResponse.json(result, {

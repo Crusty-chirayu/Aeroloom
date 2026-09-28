@@ -10,6 +10,8 @@ interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   trackedCount?: number;
+  isRefreshing?: boolean;
+  isStale?: boolean;
 }
 
 export default function Header({
@@ -18,6 +20,8 @@ export default function Header({
   searchQuery,
   onSearchChange,
   trackedCount = 0,
+  isRefreshing = false,
+  isStale = false,
 }: HeaderProps) {
   const [utcTime, setUtcTime] = useState<string>('');
   const [isSectorDropdownOpen, setIsSectorDropdownOpen] = useState(false);
@@ -124,9 +128,29 @@ export default function Header({
         {/* Telemetry Status Badges */}
         <div className="flex items-center gap-3 sm:gap-4 font-mono text-xs">
           {/* ADS-B Live Status */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#080b11] border border-[#1f293d] text-slate-300">
-            <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="text-[11px] hidden sm:inline text-emerald-400 font-semibold">ADS-B LIVE</span>
+          <div
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors ${
+              isStale
+                ? 'bg-amber-950/30 border-amber-500/40 text-amber-300'
+                : 'bg-[#080b11] border-[#1f293d] text-slate-300'
+            }`}
+          >
+            <Radio
+              className={`w-3.5 h-3.5 ${
+                isStale
+                  ? 'text-amber-400'
+                  : isRefreshing
+                  ? 'text-sky-400 animate-spin'
+                  : 'text-emerald-400 animate-pulse'
+              }`}
+            />
+            <span
+              className={`text-[11px] hidden sm:inline font-semibold ${
+                isStale ? 'text-amber-400' : 'text-emerald-400'
+              }`}
+            >
+              {isStale ? 'FEED STALE' : isRefreshing ? 'SYNCING...' : 'ADS-B LIVE'}
+            </span>
             {trackedCount > 0 && (
               <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
                 {trackedCount}
