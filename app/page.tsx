@@ -1,69 +1,147 @@
-import Image from "next/image";
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Terrain from '@/components/hero/Terrain';
+import { Search, Radio, Compass, Plane, ShieldCheck, Activity } from 'lucide-react';
 
 export default function Home() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [utcTime, setUtcTime] = useState<string>('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setUtcTime(now.toUTCString().slice(17, 25) + ' UTC');
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col selection:bg-sky-500/30 selection:text-sky-200">
+      {/* Top Telemetry Header */}
+      <header className="border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-xl sticky top-0 z-30 px-6 py-3.5">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-sky-600 to-cyan-400 flex items-center justify-center shadow-lg shadow-sky-500/20">
+              <Plane className="w-4 h-4 text-slate-950 -rotate-45" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold tracking-wider text-base bg-gradient-to-r from-white via-slate-200 to-sky-300 bg-clip-text text-transparent">
+                  AEROLOOM
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/30 font-semibold">
+                  PHASE 0
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-mono tracking-tight">
+                SIGNATURE SLICE TELEMETRY
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-5 text-xs font-mono">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-slate-300">
+              <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+              <span>RADAR GRID ACTIVE</span>
+            </div>
+            <div className="text-slate-400 tracking-wider">
+              {utcTime || '00:00:00 UTC'}
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* Main Hero & 3D Radar Surface */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 flex flex-col gap-6">
+        {/* Hero Headline & Functional Search Bar */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-400 text-xs font-mono mb-2">
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              Real-Time Atmospheric Surface & Flight Vector Ping
+            </div>
+            <h1 className="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+              Planetary Radar Grid & Live Telemetry
+            </h1>
+            <p className="text-sm text-slate-400 mt-1 max-w-xl">
+              Interact with the GPU GLSL-displacement terrain below. Live aircraft coordinates from airplanes.live are projected directly into the 3D space.
+            </p>
+          </div>
+
+          {/* Persistent Search Bar (USABLE EVEN ON CONTEXT LOSS / STATIC FALLBACK) */}
+          <div className="w-full md:w-80">
+            <label htmlFor="flight-search" className="block text-[11px] font-mono text-slate-400 mb-1.5">
+              SEARCH ACTIVE CALLSIGN
+            </label>
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                id="flight-search"
+                type="text"
+                placeholder="e.g. SWA, DAL, UAL..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 text-sm bg-slate-900/90 border border-slate-700/80 rounded-xl text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3D Scene Container */}
+        <section className="relative w-full">
+          <Terrain />
+        </section>
+
+        {/* Radar Telemetry Information Strip */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
+              <Compass className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-mono text-slate-400 uppercase">Projection Space</div>
+              <div className="text-sm font-semibold text-slate-200 mt-0.5">Cartesian Radar Normal</div>
+              <p className="text-xs text-slate-400 mt-1">
+                Geographic coordinates normalized onto decorative 3D radar grid.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <Radio className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-mono text-slate-400 uppercase">Provider Status</div>
+              <div className="text-sm font-semibold text-emerald-400 mt-0.5">airplanes.live ADS-B</div>
+              <p className="text-xs text-slate-400 mt-1">
+                Server-side bounding box telemetry ingest with zero credentials leaked.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="text-xs font-mono text-slate-400 uppercase">Tier Enforcement</div>
+              <div className="text-sm font-semibold text-indigo-300 mt-0.5">Hardware Adaptive</div>
+              <p className="text-xs text-slate-400 mt-1">
+                Full (9.6k pts + Bloom), Reduced (2.4k pts), Static fallback on context loss.
+              </p>
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-800/80 py-4 px-6 text-center text-xs font-mono text-slate-400">
+        Aeroloom Flight Tracker &copy; 2026 &bull; Phase 0 Signature Slice &bull; Public ADS-B Data Courtesy of airplanes.live
+      </footer>
     </div>
   );
 }

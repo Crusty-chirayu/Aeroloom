@@ -18,29 +18,29 @@ Build the smallest real working prototype combining:
   - [x] Add automated test runner configuration
   - [x] Verify `npm run dev` and `npm run build`
 
-- [ ] **Task 0.2 — R3F Terrain**
-  - [ ] Implement `components/hero/Terrain.tsx`
-  - [ ] Render grid-laid dotted terrain using Three.js Points buffer / InstancedMesh
-  - [ ] Point count configurable by device tier (Full: 8,000–10,000, Reduced: 2,000–2,500)
-  - [ ] Ensure efficient GPU rendering without per-frame React state churn
-  - [ ] Verify rendering in browser without console errors
+- [x] **Task 0.2 — R3F Terrain**
+  - [x] Implement `components/hero/Terrain.tsx`
+  - [x] Render grid-laid dotted terrain using Three.js Points buffer / InstancedMesh
+  - [x] Point count configurable by device tier (Full: 8,000–10,000 [9,600], Reduced: 2,000–2,500 [2,400])
+  - [x] Ensure efficient GPU rendering without per-frame React state churn
+  - [x] Verify rendering in browser without console errors
 
-- [ ] **Task 0.3 — Real Cursor-Displacement Shader**
-  - [ ] Implement vertex shader in `components/hero/terrain.vert.glsl`
-  - [ ] Implement fragment shader in `components/hero/terrain.frag.glsl`
-  - [ ] Shader uniforms: `u_cursor` (vec2/vec3), `u_time` (float), `u_intensity` (float)
-  - [ ] Smooth damped cursor movement settling in ~300–600ms
-  - [ ] In-scene GPU evaluation via `useFrame` uniform updates
-  - [ ] FPS / performance debug overlay with toggle for screenshots
-  - [ ] Real pointer interaction tested in browser
+- [x] **Task 0.3 — Real Cursor-Displacement Shader**
+  - [x] Implement vertex shader in `components/hero/terrain.vert.glsl`
+  - [x] Implement fragment shader in `components/hero/terrain.frag.glsl`
+  - [x] Shader uniforms: `u_cursor` (vec3), `u_time` (float), `u_intensity` (float)
+  - [x] Smooth damped cursor movement settling in ~300–600ms
+  - [x] In-scene GPU evaluation via `useFrame` uniform updates
+  - [x] FPS / performance debug overlay with toggle for screenshots
+  - [x] Real pointer interaction tested in browser
 
-- [ ] **Task 0.4 — Device Tiers and Fallbacks**
-  - [ ] Implement `lib/deviceTier.ts` (Full, Reduced, Static tiers)
-  - [ ] Tier detection: `hardwareConcurrency >= 8` + FPS probe >= 50 FPS for Full (with bloom); Reduced without bloom; Static fallback for context loss or low FPS (< 20)
-  - [ ] Manual tier override support for testing (`?tier=full|reduced|static` or UI toggle)
-  - [ ] Graceful WebGL context loss handling (page and UI remain fully usable)
-  - [ ] Avoid mapping touch events to synthetic cursor movements
-  - [ ] Test all three tiers and fallback states
+- [x] **Task 0.4 — Device Tiers and Fallbacks**
+  - [x] Implement `lib/deviceTier.ts` (Full, Reduced, Static tiers)
+  - [x] Tier detection: `hardwareConcurrency >= 8` + FPS probe >= 50 FPS for Full (with bloom); Reduced without bloom; Static fallback for context loss or low FPS (< 20)
+  - [x] Manual tier override support for testing (`?tier=full|reduced|static` and HUD interactive selector)
+  - [x] Graceful WebGL context loss handling (page and UI remain fully usable)
+  - [x] Avoid mapping touch events to synthetic cursor movements
+  - [x] Test all three tiers and fallback states via browser subagent
 
 - [ ] **Task 0.5 — Real Aircraft Provider**
   - [ ] Implement `lib/providers/positions/airplanesLive.ts` adapter
