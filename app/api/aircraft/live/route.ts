@@ -6,6 +6,7 @@ import {
   DEFAULT_QUERY_LOCATION,
 } from '@/lib/providers/positions/airplanesLive';
 import type { ProviderResponse } from '@/lib/providers/positions/types';
+import { enrichAircraftPositions } from '@/lib/providers/enrichment';
 
 // Rate limiting and server-side cache (minimum 6s cache to respect public API rate limits)
 interface CacheEntry {
@@ -50,6 +51,14 @@ export async function GET(request: NextRequest) {
     result = await fetchAdsbOpenPositions({ lat, lon, radiusNm });
   } else {
     result = await getLiveAircraftPositions({ lat, lon, radiusNm });
+  }
+
+  // Enrich aircraft with authentic metadata, operator details, and verified routes
+  if (result.success && result.aircraft.length > 0) {
+    result = {
+      ...result,
+      aircraft: enrichAircraftPositions(result.aircraft),
+    };
   }
 
   if (result.success) {
