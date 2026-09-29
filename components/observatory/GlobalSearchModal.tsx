@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Plane, MapPin, X, ArrowUpRight, Compass } from 'lucide-react';
+import { Search, Plane, MapPin, X, ArrowUpRight, Compass, Building2 } from 'lucide-react';
 import type { AircraftPosition } from '@/lib/providers/positions/types';
 import { AVIATION_SECTORS, type AviationSector } from '@/lib/map/config';
 import { formatAltitude, formatSpeed } from '@/lib/map/aircraftGeoJson';
+import { GLOBAL_AIRPORTS } from '@/lib/airports/airportData';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -35,7 +36,18 @@ export default function GlobalSearchModal({
       s.id.toUpperCase().includes(trimmed)
   );
 
-  // 2. Matching Live ADS-B Aircraft
+  // 2. Matching Global Airports
+  const matchingAirports = trimmed
+    ? GLOBAL_AIRPORTS.filter(
+        (a) =>
+          a.iata.toUpperCase().includes(trimmed) ||
+          a.icao.toUpperCase().includes(trimmed) ||
+          a.name.toUpperCase().includes(trimmed) ||
+          a.city.toUpperCase().includes(trimmed)
+      ).slice(0, 6)
+    : [];
+
+  // 3. Matching Live ADS-B Aircraft
   const matchingAircraft = aircraftList
     .filter((ac) => {
       if (!trimmed) return true;
@@ -43,16 +55,19 @@ export default function GlobalSearchModal({
       const hex = (ac.id || '').toUpperCase();
       const type = (ac.aircraftType || '').toUpperCase();
       const reg = (ac.registration || '').toUpperCase();
+      const airlineName = (ac.airline?.name || '').toUpperCase();
       return (
         callsign.includes(trimmed) ||
         hex.includes(trimmed) ||
         type.includes(trimmed) ||
-        reg.includes(trimmed)
+        reg.includes(trimmed) ||
+        airlineName.includes(trimmed)
       );
     })
     .slice(0, 15); // Cap to top 15 results for performance
 
-  const totalResultsCount = matchingSectors.length + matchingAircraft.length;
+  const totalResultsCount =
+    matchingSectors.length + matchingAirports.length + matchingAircraft.length;
 
   useEffect(() => {
     if (isOpen) {
@@ -98,8 +113,17 @@ export default function GlobalSearchModal({
         if (selectedIndex < matchingSectors.length) {
           const s = matchingSectors[selectedIndex];
           if (s) handleSelectSectorItem(s);
+        } else if (selectedIndex < matchingSectors.length + matchingAirports.length) {
+          const ap = matchingAirports[selectedIndex - matchingSectors.length];
+          if (ap) {
+            window.location.href = `/airport/${ap.iata.toLowerCase()}`;
+            onClose();
+          }
         } else {
-          const ac = matchingAircraft[selectedIndex - matchingSectors.length];
+          const ac =
+            matchingAircraft[
+              selectedIndex - matchingSectors.length - matchingAirports.length
+            ];
           if (ac) handleSelectAircraftItem(ac.id);
         }
       }
@@ -177,6 +201,58 @@ export default function GlobalSearchModal({
             </div>
           )}
 
+          {/* Global Airports Section */}
+          {matchingAirports.length > 0 && (
+            <div>
+              <div className="px-3 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Building2 className="w-3 h-3 text-sky-400" />
+                <span>Global Airports ({matchingAirports.length})</span>
+              </div>
+              <div className="space-y-1 mt-1">
+                {matchingAirports.map((airport, index) => {
+                  const globalIdx = matchingSectors.length + index;
+                  const isItemActive = globalIdx === selectedIndex;
+                  return (
+                    <a
+                      key={airport.icao}
+                      href={`/airport/${airport.iata.toLowerCase()}`}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors group ${
+                        isItemActive
+                          ? 'bg-[#152338] border border-sky-500/50'
+                          : 'hover:bg-[#151d2c] border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
+                          <Building2 className="w-3.5 h-3.5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-white group-hover:text-sky-300">
+                              {airport.iata}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">
+                              {airport.icao}
+                            </span>
+                            <span className="text-slate-300 text-[11px] truncate max-w-[200px]">
+                              {airport.name}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">
+                            {airport.city}, {airport.country}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/25">
+                        VIEW AIRPORT &rarr;
+                      </span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Live ADS-B Aircraft Section */}
           <div>
             <div className="px-3 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider flex items-center justify-between">
@@ -190,7 +266,8 @@ export default function GlobalSearchModal({
             {matchingAircraft.length > 0 ? (
               <div className="space-y-1 mt-1">
                 {matchingAircraft.map((ac, index) => {
-                  const globalIdx = matchingSectors.length + index;
+                  const globalIdx =
+                    matchingSectors.length + matchingAirports.length + index;
                   const isItemActive = globalIdx === selectedIndex;
                   const altStr = formatAltitude(ac.altitude, ac.isGround);
                   const spdStr = formatSpeed(ac.speed);
@@ -215,6 +292,11 @@ export default function GlobalSearchModal({
                             <span className={`font-bold tracking-wider ${isItemActive ? 'text-sky-300' : 'text-white group-hover:text-sky-300'}`}>
                               {ac.callsign || ac.id.toUpperCase()}
                             </span>
+                            {ac.airline && (
+                              <span className="text-[10px] text-sky-400 font-semibold truncate max-w-[130px]">
+                                {ac.airline.name}
+                              </span>
+                            )}
                             {ac.registration && (
                               <span className="text-[10px] text-slate-400">({ac.registration})</span>
                             )}
