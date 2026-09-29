@@ -173,4 +173,78 @@ describe('Aircraft GeoJSON & Telemetry Formatter', () => {
     assert.strictEqual(empty.type, 'FeatureCollection');
     assert.strictEqual(empty.features.length, 0);
   });
+
+  test('classifyAltitudeStrata categorizes stratosphere, cruise, terminal, and ground correctly', async () => {
+    const { classifyAltitudeStrata } = await import('../lib/map/aircraftGeoJson.ts');
+    assert.strictEqual(classifyAltitudeStrata(35000, false), 'stratosphere');
+    assert.strictEqual(classifyAltitudeStrata(22000, false), 'cruise');
+    assert.strictEqual(classifyAltitudeStrata(5000, false), 'terminal');
+    assert.strictEqual(classifyAltitudeStrata(0, true), 'ground');
+    assert.strictEqual(classifyAltitudeStrata(-100, false), 'ground');
+  });
+
+  test('calculateClutterMetrics measures label reduction ratio on dense airspace cluster', async () => {
+    const { calculateClutterMetrics, aircraftToGeoJson } = await import('../lib/map/aircraftGeoJson.ts');
+    // Generate a synthetic dense cluster of 100 aircraft (similar to JFK/EWR confluence)
+    // 60 high-altitude level cruise flights, 30 terminal/climbing flights, 10 ground
+    const denseFleet: AircraftPosition[] = [];
+    for (let i = 0; i < 60; i++) {
+      denseFleet.push({
+        id: `high_${i}`,
+        callsign: `CRZ${i}`,
+        latitude: 40.7 + (i * 0.01),
+        longitude: -74.0 + (i * 0.01),
+        altitude: 33000 + (i * 100),
+        heading: 90,
+        speed: 480,
+        verticalRate: 0, // Level cruise
+        timestamp: Date.now(),
+        source: 'adsb-open',
+        isGround: false,
+      });
+    }
+    for (let i = 0; i < 30; i++) {
+      denseFleet.push({
+        id: `term_${i}`,
+        callsign: `TRM${i}`,
+        latitude: 40.6 + (i * 0.01),
+        longitude: -73.8 + (i * 0.01),
+        altitude: 4000 + (i * 100),
+        heading: 220,
+        speed: 210,
+        verticalRate: -800, // Active descent
+        timestamp: Date.now(),
+        source: 'adsb-open',
+        isGround: false,
+      });
+    }
+    for (let i = 0; i < 10; i++) {
+      denseFleet.push({
+        id: `gnd_${i}`,
+        callsign: `GND${i}`,
+        latitude: 40.64 + (i * 0.001),
+        longitude: -73.78 + (i * 0.001),
+        altitude: 0,
+        heading: 45,
+        speed: 12,
+        timestamp: Date.now(),
+        source: 'adsb-open',
+        isGround: true,
+      });
+    }
+
+    const geojson = aircraftToGeoJson(denseFleet);
+    const metrics = calculateClutterMetrics(geojson);
+
+    assert.strictEqual(metrics.totalAircraft, 100);
+    assert.strictEqual(metrics.stratosphereCount, 60);
+    assert.strictEqual(metrics.terminalCount, 30);
+    assert.strictEqual(metrics.groundCount, 10);
+    assert.strictEqual(metrics.baselineUnfilteredLabelCount, 90);
+    // Only terminal and climbing flights show labels by default in dense airspace
+    assert.strictEqual(metrics.strataFilteredLabelCount, 30);
+    // Reduction ratio: (90 - 30) / 90 = 0.67 (~67% reduction)
+    assert.ok(metrics.labelReductionRatio >= 0.65, `Expected >= 65% clutter reduction, got ${metrics.labelReductionRatio}`);
+  });
 });
+

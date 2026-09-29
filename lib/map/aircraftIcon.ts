@@ -13,6 +13,7 @@ export const ICON_IDS = {
   EMERALD: 'ac-icon-emerald',
   AMBER: 'ac-icon-amber',
   CRIMSON: 'ac-icon-crimson',
+  VIOLET: 'ac-icon-violet',
   SELECTED: 'ac-icon-selected',
 } as const;
 
@@ -123,6 +124,7 @@ export function registerAircraftIcons(map: MapLibreMap): void {
     { id: ICON_IDS.EMERALD, color: '#10b981', selected: false },
     { id: ICON_IDS.AMBER, color: '#f59e0b', selected: false },
     { id: ICON_IDS.CRIMSON, color: '#ef4444', selected: false },
+    { id: ICON_IDS.VIOLET, color: '#818cf8', selected: false },
     { id: ICON_IDS.SELECTED, color: '#38bdf8', selected: true },
   ];
 
