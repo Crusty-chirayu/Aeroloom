@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { AircraftPosition } from '@/lib/providers/positions/types';
+import Link from 'next/link';
+import type { AircraftPosition, PositionSample } from '@/lib/providers/positions/types';
 import {
   formatAltitude,
   formatSpeed,
@@ -9,6 +10,7 @@ import {
   classifyAltitudeStrata,
   matchesFlightFilter,
 } from '@/lib/map/aircraftGeoJson';
+import { useUserStore } from '@/lib/storage/userStore';
 import {
   Plane,
   Compass,
@@ -23,6 +25,14 @@ import {
   Layers,
   Copy,
   Check,
+  Star,
+  Play,
+  Pause,
+  RotateCcw,
+  FastForward,
+  ExternalLink,
+  Route,
+  Building2,
 } from 'lucide-react';
 
 interface HorizonDockProps {
@@ -30,10 +40,20 @@ interface HorizonDockProps {
   selectedAircraft: AircraftPosition | null;
   selectedAircraftId: string | null;
   isFollowMode: boolean;
+  selectedAircraftTrail?: PositionSample[];
+  isReplayActive?: boolean;
+  isReplayPlaying?: boolean;
+  replayIndex?: number;
+  replaySpeed?: number;
   onToggleFollow: () => void;
   onCenterFlight: () => void;
   onCloseDossier: () => void;
   onSelectAircraft: (id: string | null) => void;
+  onStartReplay?: () => void;
+  onToggleReplayPlay?: () => void;
+  onSeekReplay?: (index: number) => void;
+  onSetReplaySpeed?: (speed: number) => void;
+  onStopReplay?: () => void;
   activeFilter: 'ALL' | 'CRUISE' | 'CLIMB' | 'GROUND' | 'EMERGENCY';
   onFilterChange: (filter: 'ALL' | 'CRUISE' | 'CLIMB' | 'GROUND' | 'EMERGENCY') => void;
 }
@@ -43,15 +63,28 @@ export default function HorizonDock({
   selectedAircraft,
   selectedAircraftId,
   isFollowMode,
+  selectedAircraftTrail = [],
+  isReplayActive = false,
+  isReplayPlaying = false,
+  replayIndex = 0,
+  replaySpeed = 1,
   onToggleFollow,
   onCenterFlight,
   onCloseDossier,
   onSelectAircraft,
+  onStartReplay,
+  onToggleReplayPlay,
+  onSeekReplay,
+  onSetReplaySpeed,
+  onStopReplay,
   activeFilter,
   onFilterChange,
 }: HorizonDockProps) {
   const [isListExpanded, setIsListExpanded] = useState(false);
   const [hasCopied, setHasCopied] = useState(false);
+  const { isFlightSaved, toggleSaveFlight } = useUserStore();
+
+  const isSaved = selectedAircraft ? isFlightSaved(selectedAircraft.id) : false;
 
   // Calculate sector altitude distribution
   const total = aircraftList.length;
@@ -177,15 +210,23 @@ export default function HorizonDock({
                 <Plane className="w-4 h-4 -rotate-45" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-lg font-bold text-white tracking-wider">
                     {selectedAircraft.callsign || selectedAircraft.id.toUpperCase()}
                   </span>
                   {selectedAircraft.registration && (
                     <span className="text-xs text-slate-400">({selectedAircraft.registration})</span>
                   )}
+                  {selectedAircraft.airline && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-sky-950/70 border border-sky-700/60 text-sky-300 font-semibold flex items-center gap-1">
+                      <Building2 className="w-3 h-3" />
+                      {selectedAircraft.airline.name}
+                    </span>
+                  )}
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                    {selectedAircraft.aircraftType || 'GENERIC'}
+                    {selectedAircraft.aircraftDetails
+                      ? `${selectedAircraft.aircraftDetails.manufacturer} ${selectedAircraft.aircraftDetails.model}`
+                      : selectedAircraft.aircraftType || 'GENERIC'}
                   </span>
                   {selectedAircraft.squawk && (
                     <span
@@ -202,14 +243,112 @@ export default function HorizonDock({
               </div>
             </div>
 
-            <button
-              onClick={onCloseDossier}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title="Close Dossier (Esc)"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => toggleSaveFlight(selectedAircraft)}
+                className={`p-1.5 rounded-lg border transition-colors ${
+                  isSaved
+                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                    : 'bg-[#0f172a] border-[#1f293d] text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+                title={isSaved ? 'Remove from Saved Flights' : 'Save to Watchlist'}
+              >
+                <Star className={`w-4 h-4 ${isSaved ? 'fill-amber-400 text-amber-400' : ''}`} />
+              </button>
+              <button
+                onClick={onCloseDossier}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                title="Close Dossier (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Authentic Route Corridor & Provenance Banner */}
+          <div className="my-2.5 px-3 py-1.5 rounded-xl bg-[#0b1222] border border-[#1f293d]/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+            {selectedAircraft.route ? (
+              <div className="flex items-center gap-2">
+                <Route className="w-3.5 h-3.5 text-sky-400" />
+                <span className="font-semibold text-slate-200">
+                  {selectedAircraft.route.origin.iata} ({selectedAircraft.route.origin.city})
+                </span>
+                <span className="text-sky-400">&rarr;</span>
+                <span className="font-semibold text-slate-200">
+                  {selectedAircraft.route.destination.iata} ({selectedAircraft.route.destination.city})
+                </span>
+                {selectedAircraft.route.distanceNm && (
+                  <span className="text-[10px] text-slate-400">
+                    &bull; {Math.round(selectedAircraft.route.distanceNm)} NM
+                  </span>
+                )}
+                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-400 uppercase font-mono">
+                  Verified Route
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-slate-400 text-[11px]">
+                <Route className="w-3.5 h-3.5 text-slate-500" />
+                <span>Route unfiled &bull; Transponder-only telemetry</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+              <span>SRC:</span>
+              <span className="text-slate-300 font-semibold">{selectedAircraft.source.toUpperCase()}</span>
+            </div>
+          </div>
+
+          {/* Interactive Replay Scrubber (When Replay Is Active) */}
+          {isReplayActive && (
+            <div className="my-2 p-3 rounded-xl bg-sky-950/40 border border-sky-700/50 flex flex-col gap-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-sky-300 font-bold flex items-center gap-1.5">
+                  <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                  REPLAY MODE &bull; SAMPLE {replayIndex + 1} OF {selectedAircraftTrail.length}
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-[#080d1a] border border-sky-800/60 rounded-lg p-0.5 text-[10px]">
+                    {[1, 2, 4].map((spd) => (
+                      <button
+                        key={spd}
+                        onClick={() => onSetReplaySpeed?.(spd)}
+                        className={`px-1.5 py-0.5 rounded ${
+                          replaySpeed === spd
+                            ? 'bg-sky-500 text-white font-bold'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {spd}x
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={onStopReplay}
+                    className="px-2 py-0.5 rounded bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-300 text-[10px] font-semibold"
+                  >
+                    EXIT REPLAY
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={onToggleReplayPlay}
+                  className="w-7 h-7 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 flex items-center justify-center transition-colors"
+                >
+                  {isReplayPlaying ? <Pause className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={Math.max(1, selectedAircraftTrail.length - 1)}
+                  value={replayIndex}
+                  onChange={(e) => onSeekReplay?.(parseInt(e.target.value, 10))}
+                  className="flex-1 accent-sky-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
+                />
+              </div>
+            </div>
+          )}
 
           {/* Telemetry Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-3 text-xs border-b border-[#1f293d]/60">
@@ -263,7 +402,7 @@ export default function HorizonDock({
 
           {/* Action Buttons & Honest Data Label */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2 text-xs">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={onToggleFollow}
                 className={`py-1.5 px-3 rounded-xl text-xs font-semibold border flex items-center gap-1.5 transition-all ${
@@ -285,6 +424,28 @@ export default function HorizonDock({
                 <span>CENTER</span>
               </button>
 
+              {/* Replay Trigger (enabled when samples exist) */}
+              {selectedAircraftTrail.length >= 2 && !isReplayActive && (
+                <button
+                  onClick={onStartReplay}
+                  className="py-1.5 px-3 rounded-xl text-xs font-semibold bg-sky-950/60 border border-sky-700/60 text-sky-300 hover:bg-sky-900/60 hover:text-white transition-all flex items-center gap-1.5"
+                  title="Replay flight breadcrumbs"
+                >
+                  <Play className="w-3 h-3 fill-current text-sky-400" />
+                  <span>REPLAY ({selectedAircraftTrail.length} PTS)</span>
+                </button>
+              )}
+
+              {/* Full Flight Dossier Route */}
+              <Link
+                href={`/flight/${selectedAircraft.id}`}
+                className="py-1.5 px-3 rounded-xl text-xs font-semibold bg-[#0f172a] border border-sky-900/60 text-sky-300 hover:bg-sky-500/20 hover:text-white transition-all flex items-center gap-1.5"
+                title="Open comprehensive telemetry and route analysis dossier"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-sky-400" />
+                <span>FULL DOSSIER</span>
+              </Link>
+
               <button
                 onClick={handleCopyTelemetry}
                 className="py-1.5 px-2.5 rounded-xl text-xs bg-[#0f172a] border border-[#1f293d] text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1"
@@ -296,7 +457,7 @@ export default function HorizonDock({
             </div>
 
             <span className="text-[9px] text-slate-500 hidden sm:inline">
-              Real-time ADS-B transponder telemetry &bull; Route archive requires feeder link
+              Real-time ADS-B transponder telemetry &bull; {selectedAircraftTrail.length} breadcrumb observations stored
             </span>
           </div>
         </div>

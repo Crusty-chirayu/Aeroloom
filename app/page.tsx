@@ -35,6 +35,16 @@ export default function Home() {
     selectedAircraft,
     selectedAircraftId,
     isFollowMode,
+    selectedAircraftTrail,
+    isReplayActive,
+    isReplayPlaying,
+    replayIndex,
+    replaySpeed,
+    startReplay,
+    toggleReplayPlay,
+    seekReplay,
+    setReplaySpeed,
+    stopReplay,
     setSelectedAircraftId,
     setIsFollowMode,
   } = useLiveAircraft({
@@ -63,6 +73,21 @@ export default function Home() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSearchOpen, selectedAircraftId, appStage, setSelectedAircraftId]);
+
+  // Handle URL query parameters (e.g. ?select=a38d95 or ?stage=observatory)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const sel = params.get('select');
+      const stage = params.get('stage');
+      if (sel) {
+        setSelectedAircraftId(sel);
+        setAppStage('observatory');
+      } else if (stage === 'observatory') {
+        setAppStage('observatory');
+      }
+    }
+  }, [setSelectedAircraftId]);
 
   // Handle Sector Switch with Camera FlyTo
   const handleSelectSector = useCallback(
@@ -218,6 +243,7 @@ export default function Home() {
                 map={map}
                 aircraft={aircraft}
                 selectedAircraftId={selectedAircraftId}
+                selectedAircraftTrail={selectedAircraftTrail}
                 searchQuery={searchQuery}
                 activeFilter={activeFilter}
                 onSelectAircraft={handleSelectFlight}
@@ -233,10 +259,20 @@ export default function Home() {
             selectedAircraft={selectedAircraft}
             selectedAircraftId={selectedAircraftId}
             isFollowMode={isFollowMode}
+            selectedAircraftTrail={selectedAircraftTrail}
+            isReplayActive={isReplayActive}
+            isReplayPlaying={isReplayPlaying}
+            replayIndex={replayIndex}
+            replaySpeed={replaySpeed}
             onToggleFollow={() => setIsFollowMode(!isFollowMode)}
             onCenterFlight={handleCenterFlight}
             onCloseDossier={() => setSelectedAircraftId(null)}
             onSelectAircraft={handleSelectFlight}
+            onStartReplay={startReplay}
+            onToggleReplayPlay={toggleReplayPlay}
+            onSeekReplay={seekReplay}
+            onSetReplaySpeed={setReplaySpeed}
+            onStopReplay={stopReplay}
             activeFilter={activeFilter}
             onFilterChange={setActiveFilter}
           />

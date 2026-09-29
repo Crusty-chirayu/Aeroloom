@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plane, Radio, ChevronDown, Search, Orbit, Layers } from 'lucide-react';
+import Link from 'next/link';
+import { Plane, Radio, ChevronDown, Search, Orbit, Layers, Building2, LayoutDashboard } from 'lucide-react';
 import { AVIATION_SECTORS, type AviationSector } from '@/lib/map/config';
 
 interface ObservatoryHeaderProps {
@@ -59,6 +60,24 @@ export default function ObservatoryHeader({
             OBSERVATORY
           </span>
         </button>
+
+        <Link
+          href="/dashboard"
+          title="Personal Flight Operations & Watchlists"
+          className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-slate-300 hover:text-white text-xs font-mono transition-all shadow-xl"
+        >
+          <LayoutDashboard className="w-3.5 h-3.5 text-sky-400" />
+          <span>DASHBOARD</span>
+        </Link>
+
+        <Link
+          href="/airports"
+          title="Global Airport Directory & Terminal Radar"
+          className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-slate-300 hover:text-white text-xs font-mono transition-all shadow-xl"
+        >
+          <Building2 className="w-3.5 h-3.5 text-sky-400" />
+          <span>AIRPORTS</span>
+        </Link>
       </div>
 
       {/* Floating Center Capsule: Sector Selector & Omnisearch */}
