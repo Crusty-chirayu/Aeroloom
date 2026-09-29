@@ -92,4 +92,21 @@ Run the automated validator from your terminal:
 ```bash
 npm run check:env
 ```
-The validator will check your environment variables, verify token formats, test network reachability to the Supabase Auth API, and confirm that Cloud-Synced mode is fully operational!
+The validator will check your environment variables, verify token formats (supporting both legacy JWT `ey...` and modern Supabase publishable keys `sb_...`), test network reachability to the Supabase Auth API, and confirm that Cloud-Synced mode is fully operational!
+
+---
+
+## 3. Hosted Project Acceptance & Live Verification Status
+
+| Component | Status | Verification Detail |
+| :--- | :--- | :--- |
+| **`.env.local` Credentials** | **Verified** | Both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` configured and non-empty. Zero secret exposure. |
+| **API Key Compatibility** | **Verified** | Modern Supabase Publishable Key (`sb_...`) verified and accepted by `validate-supabase.ts`. |
+| **Auth Service Reachability** | **Verified** | HTTP 200 received from hosted Supabase `/auth/v1/health` endpoint. |
+| **Core Database Schema** | **Verified Applied** | All 5 tables (`profiles`, `saved_flights`, `watchlists`, `alert_rules`, `airspace_alerts`) exist and returned HTTP 200. |
+| **PostgreSQL RLS Policies** | **Verified Enforced** | Unauthenticated insert attempts to `profiles`, `saved_flights`, `watchlists`, and `alert_rules` rejected with Postgres code `42501`. |
+| **Hosted Registration & Login** | **Verified Operational** | Email confirmation disabled. Tested real `signUp`, instant session issuance, `signOut`, `signInWithPassword`, and failure handling (`Invalid login credentials`). |
+| **Profile Trigger (`handle_new_user`)** | **Verified Operational** | Security definer trigger automatically provisions `public.profiles` row upon new user creation. |
+| **Authenticated RLS & Cross-User Isolation** | **Verified Enforced** | Authenticated user can read/write own flights, watchlists, rules. Writes using another user's ID are strictly rejected (42501). |
+| **Multi-Tier Persistence** | **Verified** | `CloudPersistenceAdapter` operates with graceful fallback to `LocalDevicePersistenceAdapter` when unauthenticated. |
+

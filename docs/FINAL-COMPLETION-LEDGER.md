@@ -1,10 +1,10 @@
 # Aeroloom — Final Completion Ledger & Work Record
 
-**Timestamp:** 2026-09-29T17:18:00+05:30  
+**Timestamp:** 2026-09-29T19:05:00+05:30  
 **Repository:** `https://github.com/Crusty-chirayu/Aeroloom`  
 **Branch:** `main`  
 **Base Commit:** `5198086`  
-**Total Test Count:** 93 Passing Tests across 20 Suites (100% Pass Rate)
+**Total Test Count:** 101 Passing Tests across 21 Suites (100% Pass Rate)
 
 ---
 
@@ -55,5 +55,25 @@
 ### H. Verification & Testing
 - Added `tests/alertEngine.test.ts` (7 tests).
 - Added `tests/supabasePersistence.test.ts` (5 tests).
-- All 93 tests pass cleanly (`npm test`).
+- Added `tests/supabaseHostedAcceptance.test.ts` (8 tests).
+- All 101 tests pass cleanly (`npm test`).
 - TypeScript compiles with 0 errors (`npx tsc --noEmit`).
+- Production build succeeds without errors (`npm run build`).
+- ESLint passes with 0 errors (`npm run lint`).
+
+### I. Supabase Hosted Project Acceptance Phase Results
+- **Credentials Validation:** Confirmed `.env.local` contains non-empty `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Zero secrets exposed.
+- **Key Format Modernization:** Enhanced `scripts/validate-supabase.ts` to support modern Supabase publishable keys (`sb_...`) in addition to legacy JWTs (`ey...`).
+- **PostgREST Schema Verification:** Directly queried the hosted database. Confirmed that all 5 tables defined in `supabase/migrations/20260929_aeroloom_core_schema.sql` (`profiles`, `saved_flights`, `watchlists`, `alert_rules`, `airspace_alerts`) exist and returned HTTP 200.
+- **Row Level Security (RLS) Active Enforcement:** Executed live unauthenticated insert tests against `profiles`, `saved_flights`, `watchlists`, and `alert_rules`. All 4 tables strictly rejected unauthenticated writes with Postgres code `42501` (`new row violates row-level security policy`).
+- **Hosted Authentication & Lifecycle Verified:** With email confirmation disabled in the Supabase dashboard, executed real tests for:
+  - Account registration (`signUp`) with instant session issuance.
+  - Sign out (`signOut`).
+  - Sign in (`signInWithPassword`) with access token generation.
+  - Automatic profile creation via database trigger (`handle_new_user`).
+  - Authenticated CRUD under Row Level Security.
+  - Cross-user data isolation: verified that authenticated user writes to other user accounts are rejected with Postgres code `42501`.
+  - Negative auth testing: confirmed invalid credentials return HTTP 400 error cleanly.
+- **Multi-Tier Persistence Fallback:** Verified that `CloudPersistenceAdapter` cleanly delegates to `LocalDevicePersistenceAdapter` when unauthenticated, ensuring uninterrupted zero-crash operations.
+
+

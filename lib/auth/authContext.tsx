@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const configured = isSupabaseConfigured();
+  const [isLoading, setIsLoading] = useState<boolean>(() => configured);
 
   const fetchProfile = useCallback(async (userId: string) => {
     const supabase = getSupabaseBrowserClient();
@@ -68,7 +68,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) {
-      setIsLoading(false);
       return;
     }
 

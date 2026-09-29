@@ -72,10 +72,11 @@ async function runValidation() {
   if (!anonKey) {
     console.log(`   ${RED}✘${RESET} NEXT_PUBLIC_SUPABASE_ANON_KEY: Missing.`);
     hasMissingRequired = true;
-  } else if (!anonKey.startsWith('ey')) {
-    console.log(`   ${YELLOW}⚠${RESET} NEXT_PUBLIC_SUPABASE_ANON_KEY: Present, but does not look like a valid JWT (should start with 'ey'). Length: ${anonKey.length}`);
+  } else if (!anonKey.startsWith('ey') && !anonKey.startsWith('sb_') && !anonKey.startsWith('sbp_')) {
+    console.log(`   ${YELLOW}⚠${RESET} NEXT_PUBLIC_SUPABASE_ANON_KEY: Present, but does not match standard pattern (JWT 'ey...' or modern 'sb_...'). Length: ${anonKey.length}`);
   } else {
-    console.log(`   ${GREEN}✔${RESET} NEXT_PUBLIC_SUPABASE_ANON_KEY: Validated (JWT format verified, ${anonKey.length} chars).`);
+    const keyType = anonKey.startsWith('ey') ? 'Legacy JWT' : 'Modern Publishable Key';
+    console.log(`   ${GREEN}✔${RESET} NEXT_PUBLIC_SUPABASE_ANON_KEY: Validated (${keyType} format verified, ${anonKey.length} chars).`);
   }
 
   // Check SUPABASE_SERVICE_ROLE_KEY (optional, server-only)
