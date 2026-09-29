@@ -17,8 +17,12 @@ import {
   MapPin,
   Building2,
   CheckCircle,
+  Download,
+  Upload,
+  Database,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/storage/userStore';
+import { persistenceAdapter, type AeroloomExportBundle } from '@/lib/storage/persistenceAdapter';
 import { AVIATION_SECTORS } from '@/lib/map/config';
 import type { AircraftPosition } from '@/lib/providers/positions/types';
 
@@ -66,6 +70,41 @@ export default function DashboardPage() {
       clearInterval(interval);
     };
   }, []);
+
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  const handleExportBackup = async () => {
+    try {
+      const bundle = await persistenceAdapter.exportData();
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `aeroloom-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setImportStatus('Failed to generate export bundle.');
+    }
+  };
+
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as AeroloomExportBundle;
+      const success = await persistenceAdapter.importData(parsed);
+      if (success) {
+        setImportStatus('Backup restored successfully! Reloading...');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        setImportStatus('Invalid or incompatible backup file.');
+      }
+    } catch {
+      setImportStatus('Error reading JSON file.');
+    }
+  };
 
   const handleCreateWl = (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,6 +221,55 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Persistence Architecture & Data Portability Panel (Phase E) */}
+        <div className="p-4 rounded-xl bg-[#080d1a] border border-[#1f293d] flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-sky-500/15 text-sky-400 shrink-0 mt-0.5 border border-sky-500/30">
+              <Database className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white tracking-wider">PERSISTENCE TIER:</span>
+                <span className="px-2 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300 font-semibold text-[10px]">
+                  {persistenceAdapter.mode === 'cloud-synced' ? 'CLOUD SYNCED (SUPABASE PG)' : 'DEVICE LOCAL (ISOLATED BROWSER)'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1 font-sans">
+                {persistenceAdapter.mode === 'cloud-synced'
+                  ? 'Your saved flights, custom watchlists, and alert records are authenticated and securely synchronized across all your devices.'
+                  : 'Your data is safely stored in this browser via HTML5 localStorage. No account required. Export a JSON backup to transfer your radar configuration to other machines.'}
+              </p>
+              {importStatus && (
+                <span className="text-[11px] text-amber-300 font-semibold mt-1 block">
+                  {importStatus}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleExportBackup}
+              title="Download JSON backup bundle"
+              className="px-3 py-1.5 rounded-lg bg-[#040711] border border-slate-800 hover:border-sky-500/50 text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors text-[11px]"
+            >
+              <Download className="w-3.5 h-3.5 text-sky-400" />
+              <span>EXPORT JSON</span>
+            </button>
+
+            <label className="px-3 py-1.5 rounded-lg bg-[#040711] border border-slate-800 hover:border-sky-500/50 text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors text-[11px] cursor-pointer">
+              <Upload className="w-3.5 h-3.5 text-sky-400" />
+              <span>IMPORT JSON</span>
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={handleImportBackup}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </div>
+
         {/* Tab Navigation */}
         <div className="flex items-center gap-2 border-b border-[#1f293d] pb-2 text-xs">
           <button
@@ -229,7 +317,7 @@ export default function DashboardPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>AIRCRAFT PINNED FOR CONTINUOUS MONITORING</span>
-              <span className="text-[10px] text-slate-500">SAVED IN SECURE BROWSER STORAGE</span>
+              <span className="text-[10px] text-slate-500">DEVICE-LOCAL STORAGE (NOT SYNCED ACROSS DEVICES)</span>
             </div>
 
             {savedFlights.length > 0 ? (
