@@ -161,6 +161,23 @@ export default function FlightMap({
       // Safety fallback: ensure loading overlay clears even on slow network
       setTimeout(handleReady, 3500);
 
+      // Listen for WebGL context loss on the canvas
+      const canvas = map.getCanvas();
+      const handleContextLost = (e: Event) => {
+        e.preventDefault();
+        setMapError('WebGL Context Lost (GPU reset or background tab). Click Retry Canvas below to restore.');
+        setIsLoading(false);
+      };
+      const handleContextRestored = () => {
+        setMapError(null);
+        setIsLoading(true);
+        map.resize();
+        handleReady();
+      };
+
+      canvas.addEventListener('webglcontextlost', handleContextLost, false);
+      canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
+
       // Handle tile / style error
       map.on('error', (e: ErrorEvent) => {
         if (e.error && (e.error.message.includes('style') || e.error.message.includes('WebGL'))) {
@@ -380,18 +397,7 @@ export default function FlightMap({
         </div>
       </div>
 
-      {/* Floating Tactical Layer Controls (Top-Right of Map) */}
-      <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
-        <button
-          onClick={toggleBasemap}
-          title={`Active Style: ${activeProvider.name}. Click to switch basemap.`}
-          className="px-2.5 py-1.5 rounded-lg bg-[#0f141f]/90 border border-[#1f293d] hover:border-sky-500/60 backdrop-blur-md text-[11px] font-mono text-slate-300 hover:text-white transition-all flex items-center gap-1.5 shadow-md"
-        >
-          <Layers className="w-3.5 h-3.5 text-sky-400" />
-          <span className="hidden sm:inline">{activeProvider.name}</span>
-          <span className="sm:hidden">BASEMAP</span>
-        </button>
-      </div>
+
 
       {/* Basemap Attribution Bar (Bottom-Right, compliant with CARTO and OpenStreetMap) */}
       <div className="absolute bottom-1 right-1 z-10 pointer-events-auto">

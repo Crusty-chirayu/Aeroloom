@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Plane, Radio, ChevronDown, Search, Orbit, Layers, Building2, LayoutDashboard } from 'lucide-react';
 import { AVIATION_SECTORS, type AviationSector } from '@/lib/map/config';
+import { persistenceAdapter } from '@/lib/storage/persistenceAdapter';
 
 interface ObservatoryHeaderProps {
   activeSector: AviationSector;
@@ -42,11 +43,16 @@ export default function ObservatoryHeader({
   }, []);
 
   return (
-    <header className="absolute top-3 inset-x-0 z-30 flex items-center justify-between px-3 sm:px-6 pointer-events-none select-none">
+    <header
+      role="banner"
+      aria-label="Atmospheric Observatory Navigation and Telemetry"
+      className="absolute top-3 inset-x-0 z-30 flex items-center justify-between px-3 sm:px-6 pointer-events-none select-none"
+    >
       {/* Brand & Orbit Portal Button */}
       <div className="flex items-center gap-2 pointer-events-auto">
         <button
           onClick={onReturnToOrbit}
+          aria-label="Return to 3D Orbit Landing Portal"
           title="Return to 3D Orbit Landing Portal"
           className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-white transition-all shadow-xl group"
         >
@@ -64,15 +70,20 @@ export default function ObservatoryHeader({
         <Link
           href="/dashboard"
           title="Personal Flight Operations & Watchlists"
+          aria-label="Open Operations Dashboard"
           className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-slate-300 hover:text-white text-xs font-mono transition-all shadow-xl"
         >
           <LayoutDashboard className="w-3.5 h-3.5 text-sky-400" />
           <span>DASHBOARD</span>
+          <span className="text-[8px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700">
+            {persistenceAdapter.mode === 'cloud-synced' ? 'CLOUD' : 'LOCAL'}
+          </span>
         </Link>
 
         <Link
           href="/airports"
           title="Global Airport Directory & Terminal Radar"
+          aria-label="Open Airport Directory"
           className="hidden xl:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-slate-300 hover:text-white text-xs font-mono transition-all shadow-xl"
         >
           <Building2 className="w-3.5 h-3.5 text-sky-400" />
@@ -142,11 +153,12 @@ export default function ObservatoryHeader({
         {/* Global Omnisearch Trigger */}
         <button
           onClick={onOpenSearch}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/60 backdrop-blur-md text-xs font-mono text-slate-300 hover:text-white transition-all shadow-xl group"
+          className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/60 backdrop-blur-md text-xs font-mono text-slate-300 hover:text-white transition-all shadow-xl group"
           title="Search live flights or jump to coordinates (Cmd+K)"
+          aria-label="Open search dialog"
         >
           <Search className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
-          <span className="hidden sm:inline text-slate-400">Search Flight / Callsign...</span>
+          <span className="hidden md:inline text-slate-400">Search Flight / Callsign...</span>
           <kbd className="hidden lg:inline text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
             ⌘K
           </kbd>
@@ -154,11 +166,12 @@ export default function ObservatoryHeader({
       </div>
 
       {/* Right Telemetry Pulse & Basemap Selector */}
-      <div className="flex items-center gap-2 pointer-events-auto">
+      <div className="flex items-center gap-1.5 sm:gap-2 pointer-events-auto">
         {onToggleBasemap && (
           <button
             onClick={onToggleBasemap}
             title={`Active: ${activeBasemapName}. Toggle Basemap`}
+            aria-label="Toggle map basemap style"
             className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-[11px] font-mono text-slate-300 hover:text-white transition-all shadow-xl"
           >
             <Layers className="w-3.5 h-3.5 text-sky-400" />
@@ -167,7 +180,7 @@ export default function ObservatoryHeader({
         )}
 
         <div
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border backdrop-blur-md text-xs font-mono transition-colors shadow-xl ${
+          className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border backdrop-blur-md text-xs font-mono transition-colors shadow-xl ${
             isStale
               ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
               : 'bg-[#080d1a]/85 border-[#1f293d] text-slate-300'

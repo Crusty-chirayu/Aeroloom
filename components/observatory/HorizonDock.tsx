@@ -246,6 +246,7 @@ export default function HorizonDock({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => toggleSaveFlight(selectedAircraft)}
+                aria-label={isSaved ? 'Remove from Saved Flights' : 'Save to Watchlist'}
                 className={`p-1.5 rounded-lg border transition-colors ${
                   isSaved
                     ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
@@ -257,6 +258,7 @@ export default function HorizonDock({
               </button>
               <button
                 onClick={onCloseDossier}
+                aria-label="Close Flight Dossier"
                 className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                 title="Close Dossier (Esc)"
               >

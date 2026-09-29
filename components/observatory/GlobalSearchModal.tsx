@@ -135,10 +135,16 @@ export default function GlobalSearchModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Global Flight and Sector Search"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none"
+    >
       <div
         className="fixed inset-0 -z-10"
         onClick={onClose}
+        aria-hidden="true"
       />
 
       <div className="w-full max-w-xl rounded-2xl bg-[#080d1a]/95 border border-[#1f293d] shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden font-mono text-slate-200">
@@ -148,6 +154,10 @@ export default function GlobalSearchModal({
           <input
             ref={inputRef}
             type="text"
+            role="combobox"
+            aria-expanded="true"
+            aria-autocomplete="list"
+            aria-label="Search live callsign, hex, type, or sector"
             placeholder="Search live callsign, hex, type, or sector (e.g. DAL, B738, JFK)..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -155,6 +165,7 @@ export default function GlobalSearchModal({
           />
           <button
             onClick={onClose}
+            aria-label="Close search modal"
             className="p-1 rounded-lg text-slate-500 hover:text-slate-200 transition-colors"
           >
             <X className="w-4 h-4" />
