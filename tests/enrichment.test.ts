@@ -104,6 +104,18 @@ describe('Aviation Metadata & Enrichment Pipeline Tests', () => {
       assert.ok(dist > 2200 && dist < 2300, `Expected distance ~2245nm, got ${dist}`);
     });
 
+    test('resolves international hubs EGLL (London Heathrow) and RJTT (Tokyo Haneda)', () => {
+      const lhr = getAirportByIata('LHR');
+      assert.ok(lhr);
+      assert.strictEqual(lhr.icao, 'EGLL');
+      assert.strictEqual(lhr.city, 'London');
+
+      const hnd = getAirportByIata('HND');
+      assert.ok(hnd);
+      assert.strictEqual(hnd.icao, 'RJTT');
+      assert.strictEqual(hnd.city, 'Tokyo');
+    });
+
     test('findNearestAirports identifies LGA, JFK, EWR near Manhattan coordinates', () => {
       const manhattanLat = 40.7580;
       const manhattanLon = -73.9855;
@@ -136,6 +148,14 @@ describe('Aviation Metadata & Enrichment Pipeline Tests', () => {
       const r2 = resolveFlightRoute('JBU359');
       assert.ok(r1);
       assert.strictEqual(r1, r2);
+    });
+
+    test('evicts cache properly on clearRouteCache', () => {
+      resolveFlightRoute('DAL397');
+      clearRouteCache();
+      const fresh = resolveFlightRoute('DAL397');
+      assert.ok(fresh);
+      assert.strictEqual(fresh.origin.iata, 'JFK');
     });
   });
 
