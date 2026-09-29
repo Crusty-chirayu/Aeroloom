@@ -2,9 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plane, Radio, ChevronDown, Search, Orbit, Layers, Building2, LayoutDashboard } from 'lucide-react';
+import { Plane, Radio, ChevronDown, Search, Orbit, Layers, Building2, LayoutDashboard, User, LogOut, Cloud, HardDrive, Shield } from 'lucide-react';
 import { AVIATION_SECTORS, type AviationSector } from '@/lib/map/config';
 import { persistenceAdapter } from '@/lib/storage/persistenceAdapter';
+import { useAuth } from '@/lib/auth/authContext';
+import AuthModal from '@/components/auth/AuthModal';
+import ImportLocalDataModal from '@/components/auth/ImportLocalDataModal';
 
 interface ObservatoryHeaderProps {
   activeSector: AviationSector;
@@ -29,7 +32,11 @@ export default function ObservatoryHeader({
   isRefreshing = false,
   isStale = false,
 }: ObservatoryHeaderProps) {
+  const { user, profile, signOut, isConfigured } = useAuth();
   const [isSectorOpen, setIsSectorOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [utcTime, setUtcTime] = useState<string>('');
 
   useEffect(() => {
@@ -204,7 +211,104 @@ export default function ObservatoryHeader({
             </span>
           )}
         </div>
+        {/* Operator Authentication Control */}
+        {user ? (
+          <div className="relative">
+            <button
+              onClick={() => setIsUserMenuOpen((prev) => !prev)}
+              aria-label="Operator account menu"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#080d1a]/85 border border-sky-500/30 hover:border-sky-500/60 backdrop-blur-md text-xs font-mono text-sky-300 transition-all shadow-xl"
+            >
+              <Shield className="w-3.5 h-3.5 text-sky-400" />
+              <span className="font-semibold max-w-[100px] truncate hidden sm:inline">
+                {profile?.displayName || user.email?.split('@')[0]}
+              </span>
+              <ChevronDown
+                className={`w-3 h-3 text-slate-400 transition-transform ${
+                  isUserMenuOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {isUserMenuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsUserMenuOpen(false)}
+                />
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#080d1a]/95 border border-[#1f293d] shadow-2xl p-2 z-50 font-mono backdrop-blur-xl text-slate-200">
+                  <div className="px-3 py-2 border-b border-[#1f293d]/60 mb-1">
+                    <div className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                      Authenticated Operator
+                    </div>
+                    <div className="text-xs font-bold text-white truncate mt-0.5">
+                      {profile?.displayName || user.email}
+                    </div>
+                    <div className="flex items-center gap-1 mt-1 text-[10px] text-sky-400">
+                      <Cloud className="w-3 h-3" />
+                      <span>Cloud Sync & RLS Active</span>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors"
+                  >
+                    <LayoutDashboard className="w-3.5 h-3.5 text-sky-400" />
+                    <span>Operations Dashboard</span>
+                  </Link>
+
+                  <button
+                    onClick={() => {
+                      setIsUserMenuOpen(false);
+                      setIsImportModalOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors text-left"
+                  >
+                    <HardDrive className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Sync Local Browser Data</span>
+                  </button>
+
+                  <div className="my-1 border-t border-[#1f293d]/60" />
+
+                  <button
+                    onClick={async () => {
+                      setIsUserMenuOpen(false);
+                      await signOut();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors text-left"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Disconnect Operator</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
+            aria-label="Operator sign in"
+            title="Authenticate operator for cloud sync and airspace alerts"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-xs font-mono text-slate-300 hover:text-white transition-all shadow-xl"
+          >
+            <User className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden sm:inline">SIGN IN</span>
+          </button>
+        )}
       </div>
+
+      {/* Authentication & Data Import Modals */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={() => setIsImportModalOpen(true)}
+      />
+      <ImportLocalDataModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </header>
   );
 }

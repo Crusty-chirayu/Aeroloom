@@ -44,7 +44,9 @@ export default function AircraftLayer({
 
   // Keep ref of selected aircraft for follow-mode
   const selectedAircraft = aircraft.find((a) => a.id === selectedAircraftId) || null;
-  selectedAircraftRef.current = selectedAircraft;
+  useEffect(() => {
+    selectedAircraftRef.current = selectedAircraft;
+  }, [selectedAircraft]);
 
   // Add / remove layers when map is ready or style reloads
   useEffect(() => {
@@ -55,7 +57,7 @@ export default function AircraftLayer({
       registerAircraftIcons(map);
 
       // 1. Trail Source and Layers (mounted underneath aircraft symbols)
-      let trailSource = map.getSource(TRAIL_SOURCE_ID) as GeoJSONSource | undefined;
+      const trailSource = map.getSource(TRAIL_SOURCE_ID) as GeoJSONSource | undefined;
       const initialTrail = trailToGeoJson(selectedAircraftTrail);
       if (!trailSource) {
         map.addSource(TRAIL_SOURCE_ID, {
@@ -101,7 +103,7 @@ export default function AircraftLayer({
       }
 
       // 2. Aircraft Marker Source and Layers
-      let source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
+      const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
       const initialData = aircraftToGeoJson(aircraft, selectedAircraftId, searchQuery);
 
       if (!source) {

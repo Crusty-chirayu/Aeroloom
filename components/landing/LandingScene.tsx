@@ -127,11 +127,10 @@ function DottedGridMesh({ gridX, gridZ, isDiving }: DottedGridMeshProps) {
 }
 
 function DiveCameraRig({ isDiving, onComplete }: { isDiving: boolean; onComplete?: () => void }) {
-  const { camera } = useThree();
   const progress = useRef(0);
   const completedRef = useRef(false);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (!isDiving || completedRef.current) return;
 
     const dt = Math.min(delta, 0.1);
@@ -142,9 +141,9 @@ function DiveCameraRig({ isDiving, onComplete }: { isDiving: boolean; onComplete
     const t = Math.min(1, progress.current);
     const ease = t * t * t; // Cubic in
 
-    camera.position.z = THREE.MathUtils.lerp(18, -4, ease);
-    camera.position.y = THREE.MathUtils.lerp(14, 1.5, ease);
-    camera.lookAt(0, 1.0, -12);
+    state.camera.position.z = THREE.MathUtils.lerp(18, -4, ease);
+    state.camera.position.y = THREE.MathUtils.lerp(14, 1.5, ease);
+    state.camera.lookAt(0, 1.0, -12);
 
     if (progress.current >= 1.0) {
       completedRef.current = true;
