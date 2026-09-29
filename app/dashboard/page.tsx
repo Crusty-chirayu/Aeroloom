@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -20,13 +20,30 @@ import {
   Download,
   Upload,
   Database,
+  User,
+  Shield,
+  Cloud,
+  LogOut,
+  ToggleLeft,
+  ToggleRight,
+  Radio,
+  Sliders,
 } from 'lucide-react';
 import { useUserStore } from '@/lib/storage/userStore';
-import { persistenceAdapter, type AeroloomExportBundle } from '@/lib/storage/persistenceAdapter';
-import { AVIATION_SECTORS } from '@/lib/map/config';
+import {
+  persistenceAdapter,
+  type AeroloomExportBundle,
+  type StoredAlertRule,
+} from '@/lib/storage/persistenceAdapter';
+import { evaluateAirspaceRules } from '@/lib/alerts/alertEngine';
+import { useAuth } from '@/lib/auth/authContext';
+import AuthModal from '@/components/auth/AuthModal';
+import ImportLocalDataModal from '@/components/auth/ImportLocalDataModal';
 import type { AircraftPosition } from '@/lib/providers/positions/types';
 
 export default function DashboardPage() {
+  const { user, profile, signOut, isConfigured } = useAuth();
+
   const {
     savedFlights,
     watchlists,
@@ -36,6 +53,7 @@ export default function DashboardPage() {
     createWatchlist,
     removeWatchlist,
     toggleAircraftInWatchlist,
+    addAlert,
     markAlertRead,
     clearAllAlerts,
   } = useUserStore();
@@ -45,7 +63,31 @@ export default function DashboardPage() {
   const [liveAircraft, setLiveAircraft] = useState<AircraftPosition[]>([]);
   const [isLoadingTraffic, setIsLoadingTraffic] = useState(true);
 
-  // Poll live traffic count for analytics summary
+  // Alert Rules State
+  const [alertRules, setAlertRules] = useState<StoredAlertRule[]>([]);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  // New Rule Form
+  const [newRuleName, setNewRuleName] = useState('');
+  const [newRuleType, setNewRuleType] = useState<StoredAlertRule['ruleType']>('EMERGENCY_SQUAWK');
+  const [newRuleSquawk, setNewRuleSquawk] = useState('7700');
+  const [newRuleAltitude, setNewRuleAltitude] = useState('40000');
+  const [showAddRuleForm, setShowAddRuleForm] = useState(false);
+
+  // Load configured alert rules
+  const loadAlertRules = useCallback(async () => {
+    if (persistenceAdapter.getAlertRules) {
+      const rules = await persistenceAdapter.getAlertRules(user?.id);
+      setAlertRules(rules);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadAlertRules();
+  }, [loadAlertRules]);
+
+  // Poll live traffic count for analytics summary & live alert evaluation
   useEffect(() => {
     let isCancelled = false;
     async function loadLiveTraffic() {
@@ -55,6 +97,22 @@ export default function DashboardPage() {
           const json = await res.json();
           if (json.success && Array.isArray(json.aircraft) && !isCancelled) {
             setLiveAircraft(json.aircraft);
+
+            // Real-time evaluation of live telemetry against configured rules
+            if (alertRules.length > 0) {
+              const triggered = evaluateAirspaceRules(json.aircraft, alertRules, watchlists);
+              for (const tr of triggered) {
+                addAlert({
+                  type: tr.type,
+                  severity: tr.severity,
+                  title: tr.title,
+                  message: tr.message,
+                  aircraftId: tr.aircraftId,
+                  callsign: tr.callsign,
+                  squawk: tr.squawk,
+                });
+              }
+            }
           }
         }
       } catch {
@@ -69,7 +127,7 @@ export default function DashboardPage() {
       isCancelled = true;
       clearInterval(interval);
     };
-  }, []);
+  }, [alertRules, watchlists, addAlert]);
 
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
@@ -113,6 +171,47 @@ export default function DashboardPage() {
     setNewWatchlistName('');
   };
 
+  // Toggle Alert Rule Status
+  const handleToggleRule = async (rule: StoredAlertRule) => {
+    const updated = { ...rule, enabled: !rule.enabled };
+    if (persistenceAdapter.saveAlertRule) {
+      await persistenceAdapter.saveAlertRule(updated, user?.id);
+      await loadAlertRules();
+    }
+  };
+
+  // Delete Alert Rule
+  const handleDeleteRule = async (id: string) => {
+    if (persistenceAdapter.deleteAlertRule) {
+      await persistenceAdapter.deleteAlertRule(id, user?.id);
+      await loadAlertRules();
+    }
+  };
+
+  // Create New Alert Rule
+  const handleCreateRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRuleName.trim()) return;
+
+    const newRule: StoredAlertRule = {
+      id: `rule_${Date.now()}`,
+      name: newRuleName.trim(),
+      ruleType: newRuleType,
+      enabled: true,
+      createdAt: Date.now(),
+      squawkCode: newRuleType === 'EMERGENCY_SQUAWK' ? newRuleSquawk.trim() : undefined,
+      thresholdAltitude: newRuleType === 'ALTITUDE_CEILING' ? parseInt(newRuleAltitude, 10) || 40000 : undefined,
+    };
+
+    if (persistenceAdapter.saveAlertRule) {
+      await persistenceAdapter.saveAlertRule(newRule, user?.id);
+      await loadAlertRules();
+    }
+
+    setNewRuleName('');
+    setShowAddRuleForm(false);
+  };
+
   // Sector intelligence analytics
   const totalObserved = liveAircraft.length;
   let stratoCount = 0;
@@ -153,10 +252,38 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs">
+        <div className="flex items-center gap-2 sm:gap-3 text-xs">
+          {/* Operator Auth indicator */}
+          {user ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-300">
+              <Shield className="w-3.5 h-3.5 text-sky-400" />
+              <span className="font-semibold hidden md:inline truncate max-w-[120px]">
+                {profile?.displayName || user.email?.split('@')[0]}
+              </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300">
+                CLOUD SYNC
+              </span>
+              <button
+                onClick={signOut}
+                title="Disconnect Operator"
+                className="text-slate-400 hover:text-rose-400 transition-colors ml-1"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-sky-500/50 text-slate-300 hover:text-white transition-colors"
+            >
+              <User className="w-3.5 h-3.5 text-sky-400" />
+              <span>SIGN IN</span>
+            </button>
+          )}
+
           <Link
             href="/airports"
-            className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors"
+            className="hidden sm:inline-block px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white transition-colors"
           >
             AIRPORTS
           </Link>
@@ -165,104 +292,135 @@ export default function DashboardPage() {
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold transition-colors shadow-lg shadow-sky-500/20"
           >
             <Crosshair className="w-3.5 h-3.5" />
-            <span>TACTICAL RADAR</span>
+            <span>RADAR</span>
           </Link>
         </div>
       </header>
 
       {/* Main Container */}
       <main className="max-w-6xl mx-auto px-4 py-8 sm:px-8 space-y-8 font-mono">
-        {/* Airspace Analytics Summary Banner (Phase F) */}
+        {/* Airspace Analytics Summary Banner */}
         <div className="p-6 rounded-2xl bg-[#080d1a] border border-[#1f293d] shadow-2xl relative overflow-hidden">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#1f293d]/80">
             <div>
               <span className="text-[10px] text-sky-400 uppercase tracking-widest font-semibold block">
                 INTELLIGENCE OVERVIEW &bull; CONUS AIRSPACE
               </span>
-              <h1 className="text-2xl font-bold text-white tracking-wide mt-0.5">
-                REAL-TIME AIRSPACE OPERATIONS
-              </h1>
+              <h2 className="text-xl font-bold text-white tracking-wide mt-1">
+                Active Observatory Fleet Status
+              </h2>
             </div>
-
-            <div className="flex items-center gap-2 text-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-slate-300 font-semibold">FEED ONLINE</span>
-              <span className="text-slate-500">&bull;</span>
-              <span className="text-slate-400">
-                {isLoadingTraffic ? 'SCANNING...' : `${totalObserved} AIRCRAFT TRACKED`}
+            <div className="flex items-center gap-2">
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-xs text-slate-300 font-mono">
+                {isLoadingTraffic ? 'ACQUIRING ADS-B...' : `${totalObserved.toLocaleString()} TRANSPONDERS ACTIVE`}
               </span>
             </div>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-4 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-4">
             <div className="p-3 rounded-xl bg-[#040711] border border-slate-800/80">
-              <span className="text-[9px] text-slate-500 uppercase block">STRATOSPHERE (&ge;28K)</span>
-              <span className="text-lg font-bold text-indigo-300 mt-1 block">{stratoCount}</span>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">STRATO (&gt;28K FT)</div>
+              <div className="text-lg font-bold text-sky-300 mt-1">{stratoCount}</div>
             </div>
             <div className="p-3 rounded-xl bg-[#040711] border border-slate-800/80">
-              <span className="text-[9px] text-slate-500 uppercase block">CRUISE (18K-28K)</span>
-              <span className="text-lg font-bold text-emerald-400 mt-1 block">{cruiseCount}</span>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">CRUISE (18-28K)</div>
+              <div className="text-lg font-bold text-cyan-300 mt-1">{cruiseCount}</div>
             </div>
             <div className="p-3 rounded-xl bg-[#040711] border border-slate-800/80">
-              <span className="text-[9px] text-slate-500 uppercase block">TERMINAL (&lt;18K)</span>
-              <span className="text-lg font-bold text-sky-300 mt-1 block">{termCount}</span>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">TERMINAL (&lt;18K)</div>
+              <div className="text-lg font-bold text-emerald-300 mt-1">{termCount}</div>
             </div>
             <div className="p-3 rounded-xl bg-[#040711] border border-slate-800/80">
-              <span className="text-[9px] text-slate-500 uppercase block">GROUND TAXI</span>
-              <span className="text-lg font-bold text-slate-400 mt-1 block">{gndCount}</span>
+              <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">SURFACE / GND</div>
+              <div className="text-lg font-bold text-slate-400 mt-1">{gndCount}</div>
             </div>
             <div className="p-3 rounded-xl bg-[#040711] border border-slate-800/80">
-              <span className="text-[9px] text-slate-500 uppercase block">EMERGENCY SQUAWKS</span>
-              <span className={`text-lg font-bold mt-1 block ${emergencyCount > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-500'}`}>
-                {emergencyCount} ACTIVE
-              </span>
+              <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider">EMERGENCY (7700)</div>
+              <div className={`text-lg font-bold mt-1 ${emergencyCount > 0 ? 'text-rose-400 animate-pulse' : 'text-slate-500'}`}>
+                {emergencyCount}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Persistence Architecture & Data Portability Panel (Phase E) */}
-        <div className="p-4 rounded-xl bg-[#080d1a] border border-[#1f293d] flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
-          <div className="flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-sky-500/15 text-sky-400 shrink-0 mt-0.5 border border-sky-500/30">
-              <Database className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-white tracking-wider">PERSISTENCE TIER:</span>
-                <span className="px-2 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300 font-semibold text-[10px]">
-                  {persistenceAdapter.mode === 'cloud-synced' ? 'CLOUD SYNCED (SUPABASE PG)' : 'DEVICE LOCAL (ISOLATED BROWSER)'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-1 font-sans">
-                {persistenceAdapter.mode === 'cloud-synced'
-                  ? 'Your saved flights, custom watchlists, and alert records are authenticated and securely synchronized across all your devices.'
-                  : 'Your data is safely stored in this browser via HTML5 localStorage. No account required. Export a JSON backup to transfer your radar configuration to other machines.'}
-              </p>
-              {importStatus && (
-                <span className="text-[11px] text-amber-300 font-semibold mt-1 block">
-                  {importStatus}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
+        {/* Tab Navigation & Cloud Sync Status */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1f293d] pb-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             <button
-              onClick={handleExportBackup}
-              title="Download JSON backup bundle"
-              className="px-3 py-1.5 rounded-lg bg-[#040711] border border-slate-800 hover:border-sky-500/50 text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors text-[11px]"
+              onClick={() => setActiveTab('saved')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wider transition-all ${
+                activeTab === 'saved'
+                  ? 'bg-sky-500/20 border border-sky-500/40 text-sky-300 shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
             >
-              <Download className="w-3.5 h-3.5 text-sky-400" />
-              <span>EXPORT JSON</span>
+              <Star className="w-3.5 h-3.5" />
+              <span>SAVED FLIGHTS</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-[#040711] text-[10px] border border-slate-800">
+                {savedFlights.length}
+              </span>
             </button>
 
-            <label className="px-3 py-1.5 rounded-lg bg-[#040711] border border-slate-800 hover:border-sky-500/50 text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors text-[11px] cursor-pointer">
-              <Upload className="w-3.5 h-3.5 text-sky-400" />
-              <span>IMPORT JSON</span>
+            <button
+              onClick={() => setActiveTab('watchlists')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wider transition-all ${
+                activeTab === 'watchlists'
+                  ? 'bg-sky-500/20 border border-sky-500/40 text-sky-300 shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>WATCHLISTS</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-[#040711] text-[10px] border border-slate-800">
+                {watchlists.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('alerts')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold tracking-wider transition-all ${
+                activeTab === 'alerts'
+                  ? 'bg-sky-500/20 border border-sky-500/40 text-sky-300 shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+              <span>ALERTS &amp; RULES</span>
+              {unreadAlertsCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-rose-500/30 text-rose-300 text-[10px] border border-rose-500/40 animate-pulse">
+                  {unreadAlertsCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Backup / Export / Storage Mode Controls */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[10px] text-slate-500 flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#080d1a] border border-[#1f293d]">
+              <Database className="w-3 h-3 text-sky-400" />
+              <span>{user ? 'STORAGE: CLOUD RLS' : 'STORAGE: DEVICE-LOCAL'}</span>
+            </span>
+
+            <button
+              onClick={handleExportBackup}
+              title="Download local JSON backup"
+              className="p-1.5 rounded-lg bg-[#080d1a] border border-[#1f293d] text-slate-400 hover:text-white hover:border-slate-700 transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+
+            <label
+              title="Restore local JSON backup"
+              className="p-1.5 rounded-lg bg-[#080d1a] border border-[#1f293d] text-slate-400 hover:text-white hover:border-slate-700 transition-colors cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
               <input
                 type="file"
-                accept=".json,application/json"
+                accept=".json"
                 onChange={handleImportBackup}
                 className="hidden"
               />
@@ -270,112 +428,67 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex items-center gap-2 border-b border-[#1f293d] pb-2 text-xs">
-          <button
-            onClick={() => setActiveTab('saved')}
-            className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors ${
-              activeTab === 'saved'
-                ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <Star className="w-3.5 h-3.5 fill-current" />
-            <span>SAVED FLIGHTS ({savedFlights.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('watchlists')}
-            className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors ${
-              activeTab === 'watchlists'
-                ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>WATCHLISTS ({watchlists.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('alerts')}
-            className={`px-4 py-2 rounded-xl font-bold flex items-center gap-2 transition-colors relative ${
-              activeTab === 'alerts'
-                ? 'bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-900'
-            }`}
-          >
-            <Bell className="w-3.5 h-3.5" />
-            <span>AIRSPACE ALERTS</span>
-            {unreadAlertsCount > 0 && (
-              <span className="w-2 h-2 rounded-full bg-rose-500 ml-1" />
-            )}
-          </button>
-        </div>
+        {importStatus && (
+          <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 text-xs text-sky-300">
+            {importStatus}
+          </div>
+        )}
 
         {/* TAB 1: SAVED FLIGHTS */}
         {activeTab === 'saved' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>AIRCRAFT PINNED FOR CONTINUOUS MONITORING</span>
-              <span className="text-[10px] text-slate-500">DEVICE-LOCAL STORAGE (NOT SYNCED ACROSS DEVICES)</span>
-            </div>
-
             {savedFlights.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {savedFlights.map((flight) => (
                   <div
                     key={flight.id}
-                    className="p-4 rounded-xl bg-[#080d1a] border border-[#1f293d] flex flex-col justify-between gap-3 hover:border-sky-500/50 transition-all group"
+                    className="p-4 rounded-2xl bg-[#080d1a] border border-[#1f293d] hover:border-sky-500/40 transition-all flex flex-col justify-between space-y-3"
                   >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-white text-base tracking-wider group-hover:text-sky-300 transition-colors">
-                          {flight.callsign || flight.id.toUpperCase()}
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-sky-950/80 border border-sky-800 text-sky-300 font-semibold">
-                          HEX: {flight.id.toUpperCase()}
-                        </span>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base font-bold text-white">
+                            {flight.callsign || flight.id.toUpperCase()}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                            {flight.id.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {flight.aircraftType || 'Civilian Aircraft'} &bull;{' '}
+                          {flight.registration || 'Reg Unlisted'}
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                        <span>{flight.aircraftType || 'GENERIC TYPE'}</span>
-                        {flight.registration && <span>&bull; {flight.registration}</span>}
+                      <div className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-sky-400">
+                        <Plane className="w-4 h-4" />
                       </div>
-
-                      <span className="text-[10px] text-slate-500 block mt-2">
-                        SAVED: {new Date(flight.savedAt).toLocaleDateString()}
-                      </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-[#1f293d]/60 text-xs">
-                      <Link
-                        href={`/flight/${flight.id}`}
-                        className="text-slate-400 hover:text-white flex items-center gap-1 transition-colors text-[11px]"
-                      >
-                        <span>DOSSIER</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </Link>
+                    <div className="flex items-center justify-between pt-2 border-t border-[#1f293d]/50 text-xs">
+                      <span className="text-[10px] text-slate-500">
+                        Saved {new Date(flight.savedAt).toLocaleDateString()}
+                      </span>
 
                       <div className="flex items-center gap-2">
                         <Link
-                          href={`/?select=${flight.id}&stage=observatory`}
-                          className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 font-semibold text-[11px] flex items-center gap-1"
+                          href={`/flight/${flight.id}`}
+                          className="px-3 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/20 flex items-center gap-1.5 transition-colors"
                         >
-                          <Crosshair className="w-3 h-3" />
-                          <span>TRACK</span>
+                          <span>OPEN DOSSIER</span>
+                          <ExternalLink className="w-3 h-3" />
                         </Link>
-
                         <button
                           onClick={() =>
                             toggleSaveFlight({
                               id: flight.id,
-                              callsign: flight.callsign || flight.id,
+                              callsign: flight.callsign || flight.id.toUpperCase(),
                               latitude: 0,
                               longitude: 0,
                               altitude: 0,
-                              speed: 0,
                               heading: 0,
-                              timestamp: 0,
+                              speed: 0,
+                              timestamp: Date.now(),
                               source: 'airplanes.live',
                             })
                           }
@@ -412,7 +525,6 @@ export default function DashboardPage() {
         {/* TAB 2: WATCHLISTS */}
         {activeTab === 'watchlists' && (
           <div className="space-y-6">
-            {/* Create Watchlist Form */}
             <form onSubmit={handleCreateWl} className="p-4 rounded-xl bg-[#080d1a] border border-[#1f293d] flex gap-3 text-xs">
               <input
                 type="text"
@@ -430,7 +542,6 @@ export default function DashboardPage() {
               </button>
             </form>
 
-            {/* Watchlists Grid */}
             <div className="space-y-4">
               {watchlists.map((wl) => (
                 <div
@@ -490,76 +601,235 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* TAB 3: AIRSPACE ALERTS */}
+        {/* TAB 3: AIRSPACE ALERTS & CONFIGURED RULES */}
         {activeTab === 'alerts' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span>REAL-TIME TRANSPONDER EVENT LOG</span>
-              {alerts.length > 0 && (
+          <div className="space-y-6">
+            {/* 1. Alert Rules Management Section */}
+            <div className="p-5 rounded-2xl bg-[#080d1a] border border-[#1f293d] space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#1f293d]/80">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-sky-400" />
+                  <h3 className="text-sm font-bold text-white tracking-wider">
+                    CONFIGURED ALERT RULES
+                  </h3>
+                </div>
                 <button
-                  onClick={clearAllAlerts}
-                  className="text-rose-400 hover:underline text-[11px]"
+                  onClick={() => setShowAddRuleForm(!showAddRuleForm)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-sky-300 text-xs transition-colors"
                 >
-                  CLEAR ALL ALERTS
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>{showAddRuleForm ? 'CANCEL' : 'ADD CRITERIA'}</span>
                 </button>
-              )}
-            </div>
+              </div>
 
-            {alerts.length > 0 ? (
-              <div className="space-y-2">
-                {alerts.map((alert) => (
+              {/* Add New Rule Form */}
+              {showAddRuleForm && (
+                <form onSubmit={handleCreateRule} className="p-4 rounded-xl bg-[#040711] border border-slate-800 space-y-3 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      RULE NAME
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newRuleName}
+                      onChange={(e) => setNewRuleName(e.target.value)}
+                      placeholder="e.g. VIP Transport Intercept, Stratospheric Ceiling"
+                      className="w-full px-3 py-2 rounded-xl bg-[#080d1a] border border-[#1f293d] text-white focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                        TRIGGER TYPE
+                      </label>
+                      <select
+                        value={newRuleType}
+                        onChange={(e) => setNewRuleType(e.target.value as StoredAlertRule['ruleType'])}
+                        className="w-full px-3 py-2 rounded-xl bg-[#080d1a] border border-[#1f293d] text-white focus:outline-none focus:border-sky-500"
+                      >
+                        <option value="EMERGENCY_SQUAWK">Emergency Transponder Squawk</option>
+                        <option value="ALTITUDE_CEILING">Altitude Ceiling Excursion</option>
+                        <option value="WATCHLIST_MATCH">Watchlist Target Detected</option>
+                      </select>
+                    </div>
+
+                    {newRuleType === 'EMERGENCY_SQUAWK' && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                          SQUAWK CODE
+                        </label>
+                        <input
+                          type="text"
+                          value={newRuleSquawk}
+                          onChange={(e) => setNewRuleSquawk(e.target.value)}
+                          placeholder="7700 (Emergency), 7600 (Comms)"
+                          className="w-full px-3 py-2 rounded-xl bg-[#080d1a] border border-[#1f293d] text-white focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                    )}
+
+                    {newRuleType === 'ALTITUDE_CEILING' && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                          THRESHOLD ALTITUDE (FT)
+                        </label>
+                        <input
+                          type="number"
+                          value={newRuleAltitude}
+                          onChange={(e) => setNewRuleAltitude(e.target.value)}
+                          placeholder="40000"
+                          className="w-full px-3 py-2 rounded-xl bg-[#080d1a] border border-[#1f293d] text-white focus:outline-none focus:border-sky-500"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold"
+                    >
+                      SAVE ALERT RULE
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Rules List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {alertRules.map((rule) => (
                   <div
-                    key={alert.id}
-                    className={`p-4 rounded-xl border flex items-start justify-between gap-4 transition-all ${
-                      alert.severity === 'critical'
-                        ? 'bg-rose-950/30 border-rose-800/80 text-rose-200'
-                        : 'bg-[#080d1a] border-[#1f293d] text-slate-300'
+                    key={rule.id}
+                    className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
+                      rule.enabled
+                        ? 'bg-[#040711] border-slate-800'
+                        : 'bg-[#040711]/40 border-slate-900 opacity-60'
                     }`}
                   >
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 shrink-0 mt-0.5">
-                        <ShieldAlert className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold tracking-wider">{alert.title}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
-                            {alert.aircraftId.toUpperCase()}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-300 mt-0.5 font-sans">
-                          {alert.message}
-                        </p>
-                        <span className="text-[10px] text-slate-500 mt-1 block">
-                          {new Date(alert.timestamp).toLocaleTimeString()}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-xs text-white">{rule.name}</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                          {rule.ruleType.replace('_', ' ')}
                         </span>
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {rule.squawkCode && `Target Squawk: ${rule.squawkCode}`}
+                        {rule.thresholdAltitude && `Ceiling: ${rule.thresholdAltitude.toLocaleString()} ft`}
+                        {rule.ruleType === 'WATCHLIST_MATCH' && 'Matches any monitored transponder hex'}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Link
-                        href={`/flight/${alert.aircraftId}`}
-                        className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs flex items-center gap-1"
+                      <button
+                        onClick={() => handleToggleRule(rule)}
+                        className={`p-1 rounded-lg transition-colors ${
+                          rule.enabled ? 'text-emerald-400 hover:text-emerald-300' : 'text-slate-600 hover:text-slate-400'
+                        }`}
+                        title={rule.enabled ? 'Disable Rule' : 'Enable Rule'}
                       >
-                        <span>DOSSIER</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </Link>
+                        {rule.enabled ? (
+                          <ToggleRight className="w-6 h-6" />
+                        ) : (
+                          <ToggleLeft className="w-6 h-6" />
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRule(rule.id)}
+                        className="p-1 text-slate-500 hover:text-rose-400 transition-colors"
+                        title="Delete Rule"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="p-12 rounded-2xl bg-[#080d1a] border border-[#1f293d] text-center space-y-2">
-                <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto" />
-                <h3 className="text-base font-bold text-white">ALL AIRSPACES NORMAL</h3>
-                <p className="text-xs text-slate-400 max-w-sm mx-auto">
-                  No emergency squawks (7700 / 7600) or monitored transponder alerts triggered in current telemetry window.
-                </p>
+            </div>
+
+            {/* 2. Real-Time Transponder Event Log */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span className="font-bold tracking-wider">REAL-TIME TRANSPONDER EVENT LOG</span>
+                {alerts.length > 0 && (
+                  <button
+                    onClick={clearAllAlerts}
+                    className="text-rose-400 hover:underline text-[11px]"
+                  >
+                    CLEAR ALL ALERTS
+                  </button>
+                )}
               </div>
-            )}
+
+              {alerts.length > 0 ? (
+                <div className="space-y-2">
+                  {alerts.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className={`p-4 rounded-xl border flex items-start justify-between gap-4 transition-all ${
+                        alert.severity === 'critical'
+                          ? 'bg-rose-950/30 border-rose-800/80 text-rose-200'
+                          : 'bg-[#080d1a] border-[#1f293d] text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 shrink-0 mt-0.5">
+                          <ShieldAlert className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold tracking-wider">{alert.title}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700 text-slate-300">
+                              {alert.aircraftId.toUpperCase()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 mt-0.5 font-sans">
+                            {alert.message}
+                          </p>
+                          <span className="text-[10px] text-slate-500 mt-1 block">
+                            {new Date(alert.timestamp).toLocaleTimeString()}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/flight/${alert.aircraftId}`}
+                          className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs flex items-center gap-1"
+                        >
+                          <span>DOSSIER</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-12 rounded-2xl bg-[#080d1a] border border-[#1f293d] text-center space-y-2">
+                  <CheckCircle className="w-8 h-8 text-emerald-400 mx-auto" />
+                  <h3 className="text-base font-bold text-white">ALL AIRSPACES NORMAL</h3>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                    No emergency squawks (7700 / 7600) or monitored transponder alerts triggered in current telemetry window.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>
+
+      {/* Modals */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={() => setIsImportModalOpen(true)}
+      />
+      <ImportLocalDataModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </div>
   );
 }

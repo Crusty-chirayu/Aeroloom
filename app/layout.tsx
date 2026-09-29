@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "Real-time telemetry and shader-driven spatial flight visualization platform.",
 };
 
+import { AuthProvider } from "@/lib/auth/authContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -25,7 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark h-full`}>
       <body className="min-h-full bg-[#030712] text-slate-100 font-sans antialiased flex flex-col">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
