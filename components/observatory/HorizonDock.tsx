@@ -7,6 +7,7 @@ import {
   formatSpeed,
   formatVerticalRate,
   classifyAltitudeStrata,
+  matchesFlightFilter,
 } from '@/lib/map/aircraftGeoJson';
 import {
   Plane,
@@ -72,16 +73,10 @@ export default function HorizonDock({
     }
   }
 
-  // Filtered aircraft for drawer list
-  const filteredList = aircraftList.filter((ac) => {
-    if (activeFilter === 'CRUISE') return ac.altitude >= 18000 && !ac.isGround;
-    if (activeFilter === 'CLIMB') return ac.verticalRate && Math.abs(ac.verticalRate) > 400;
-    if (activeFilter === 'GROUND') return ac.isGround || ac.altitude <= 0;
-    if (activeFilter === 'EMERGENCY') return ac.squawk === '7700' || ac.squawk === '7600';
-    return true;
-  });
+  // Filtered aircraft for drawer list using the identical strata filter engine
+  const filteredList = aircraftList.filter((ac) => matchesFlightFilter(ac, activeFilter));
 
-  const handleCopyTelemetry = () => {
+  const handleCopyTelemetry = async () => {
     if (!selectedAircraft) return;
     const data = {
       callsign: selectedAircraft.callsign,
@@ -98,9 +93,22 @@ export default function HorizonDock({
       source: selectedAircraft.source,
       timestamp: selectedAircraft.timestamp,
     };
-    navigator.clipboard.writeText(JSON.stringify(data, null, 2));
-    setHasCopied(true);
-    setTimeout(() => setHasCopied(false), 2000);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = JSON.stringify(data, null, 2);
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setHasCopied(true);
+      setTimeout(() => setHasCopied(false), 2000);
+    } catch {
+      setHasCopied(false);
+    }
   };
 
   return (

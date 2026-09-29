@@ -25,29 +25,6 @@ export default function GlobalSearchModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-      setQuery('');
-      setSelectedIndex(0);
-    }
-  }, [isOpen]);
-
-  // Handle keyboard shortcuts (Escape, Arrows, Enter)
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const trimmed = query.trim().toUpperCase();
 
   // 1. Matching Aviation Sectors
@@ -77,6 +54,18 @@ export default function GlobalSearchModal({
 
   const totalResultsCount = matchingSectors.length + matchingAircraft.length;
 
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => inputRef.current?.focus(), 50);
+      setQuery('');
+      setSelectedIndex(0);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
+
   const handleSelectSectorItem = (sector: AviationSector) => {
     onSelectSector(sector);
     onClose();
@@ -86,6 +75,40 @@ export default function GlobalSearchModal({
     onSelectAircraft(id);
     onClose();
   };
+
+  // Handle keyboard shortcuts (Escape, ArrowUp, ArrowDown, Enter)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (totalResultsCount > 0) {
+          setSelectedIndex((prev) => (prev + 1) % totalResultsCount);
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (totalResultsCount > 0) {
+          setSelectedIndex((prev) => (prev - 1 + totalResultsCount) % totalResultsCount);
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (selectedIndex < matchingSectors.length) {
+          const s = matchingSectors[selectedIndex];
+          if (s) handleSelectSectorItem(s);
+        } else {
+          const ac = matchingAircraft[selectedIndex - matchingSectors.length];
+          if (ac) handleSelectAircraftItem(ac.id);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, totalResultsCount, selectedIndex, matchingSectors, matchingAircraft]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 select-none">
@@ -124,25 +147,32 @@ export default function GlobalSearchModal({
                 <span>Airspace Sectors</span>
               </div>
               <div className="space-y-1 mt-1">
-                {matchingSectors.map((sector) => (
-                  <button
-                    key={sector.id}
-                    onClick={() => handleSelectSectorItem(sector)}
-                    className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-[#151d2c] flex items-center justify-between transition-colors group"
-                  >
-                    <div>
-                      <span className="font-semibold text-sky-300 group-hover:text-white">
-                        {sector.label}
+                {matchingSectors.map((sector, index) => {
+                  const isItemActive = index === selectedIndex;
+                  return (
+                    <button
+                      key={sector.id}
+                      onClick={() => handleSelectSectorItem(sector)}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors group ${
+                        isItemActive
+                          ? 'bg-[#152338] border border-sky-500/50'
+                          : 'hover:bg-[#151d2c] border border-transparent'
+                      }`}
+                    >
+                      <div>
+                        <span className={`font-semibold ${isItemActive ? 'text-white' : 'text-sky-300 group-hover:text-white'}`}>
+                          {sector.label}
+                        </span>
+                        <span className="text-[10px] text-slate-400 ml-2">
+                          {sector.iata} &bull; {sector.description}
+                        </span>
+                      </div>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/25">
+                        JUMP TO SECTOR &rarr;
                       </span>
-                      <span className="text-[10px] text-slate-400 ml-2">
-                        {sector.iata} &bull; {sector.description}
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/25">
-                      JUMP TO SECTOR &rarr;
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -159,22 +189,30 @@ export default function GlobalSearchModal({
 
             {matchingAircraft.length > 0 ? (
               <div className="space-y-1 mt-1">
-                {matchingAircraft.map((ac) => {
+                {matchingAircraft.map((ac, index) => {
+                  const globalIdx = matchingSectors.length + index;
+                  const isItemActive = globalIdx === selectedIndex;
                   const altStr = formatAltitude(ac.altitude, ac.isGround);
                   const spdStr = formatSpeed(ac.speed);
                   return (
                     <button
                       key={ac.id}
                       onClick={() => handleSelectAircraftItem(ac.id)}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-[#151d2c] flex items-center justify-between transition-colors group"
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs flex items-center justify-between transition-colors group ${
+                        isItemActive
+                          ? 'bg-[#152338] border border-sky-500/50'
+                          : 'hover:bg-[#151d2c] border border-transparent'
+                      }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-[#080d1a] border border-[#1f293d] flex items-center justify-center text-sky-400 group-hover:border-sky-500/50">
+                        <div className={`w-7 h-7 rounded-lg bg-[#080d1a] border flex items-center justify-center text-sky-400 ${
+                          isItemActive ? 'border-sky-400' : 'border-[#1f293d] group-hover:border-sky-500/50'
+                        }`}>
                           <Plane className="w-3.5 h-3.5 -rotate-45" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="font-bold text-white tracking-wider group-hover:text-sky-300">
+                            <span className={`font-bold tracking-wider ${isItemActive ? 'text-sky-300' : 'text-white group-hover:text-sky-300'}`}>
                               {ac.callsign || ac.id.toUpperCase()}
                             </span>
                             {ac.registration && (
@@ -198,7 +236,9 @@ export default function GlobalSearchModal({
                         <span className="text-[10px] text-slate-500 font-mono block">
                           HDG: {Math.round(ac.heading || 0)}°
                         </span>
-                        <span className="text-[10px] text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className={`text-[10px] text-sky-400 transition-opacity ${
+                          isItemActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`}>
                           LOCATE &rarr;
                         </span>
                       </div>

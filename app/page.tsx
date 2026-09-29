@@ -207,6 +207,7 @@ export default function Home() {
         <main className="relative w-full h-full overflow-hidden">
           <FlightMap
             activeSector={activeSector}
+            providerKey={activeBasemapKey}
             onSectorChange={setActiveSector}
             onMapReady={(map) => {
               mapInstanceRef.current = map;
@@ -218,8 +219,10 @@ export default function Home() {
                 aircraft={aircraft}
                 selectedAircraftId={selectedAircraftId}
                 searchQuery={searchQuery}
+                activeFilter={activeFilter}
                 onSelectAircraft={handleSelectFlight}
                 isFollowMode={isFollowMode}
+                onDisableFollowMode={() => setIsFollowMode(false)}
               />
             )}
           </FlightMap>

@@ -96,4 +96,28 @@ describe('lib/providers/positions/airplanesLive normalization tests', () => {
     assert.equal(normalizeAircraftRecord('invalid string'), null);
     assert.equal(normalizeAircraftRecord(12345), null);
   });
+
+  test('getLiveAircraftPositions returns structured ProviderResponse shape', async () => {
+    const { getLiveAircraftPositions } = await import('../lib/providers/positions/airplanesLive.ts');
+    const result = await getLiveAircraftPositions({
+      lat: 40.6413,
+      lon: -73.7781,
+      radiusNm: 25,
+    });
+
+    assert.strictEqual(typeof result.success, 'boolean');
+    assert.ok(Array.isArray(result.aircraft));
+    assert.strictEqual(typeof result.timestamp, 'number');
+    assert.strictEqual(typeof result.totalFound, 'number');
+    assert.ok(typeof result.provider === 'string');
+
+    // If successful, all returned aircraft must have valid coordinates
+    if (result.success && result.aircraft.length > 0) {
+      for (const ac of result.aircraft) {
+        assert.ok(ac.latitude >= -90 && ac.latitude <= 90);
+        assert.ok(ac.longitude >= -180 && ac.longitude <= 180);
+        assert.ok(ac.heading >= 0 && ac.heading < 360);
+      }
+    }
+  });
 });

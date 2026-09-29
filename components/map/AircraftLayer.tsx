@@ -10,13 +10,17 @@ const SOURCE_ID = 'aircraft-source';
 const LAYER_UNSELECTED_ID = 'aircraft-layer';
 const LAYER_SELECTED_ID = 'aircraft-selected-layer';
 
+import type { FlightCategoryFilter } from '@/lib/map/aircraftGeoJson';
+
 interface AircraftLayerProps {
   map: MapLibreMap | null;
   aircraft: AircraftPosition[];
   selectedAircraftId: string | null;
   searchQuery?: string;
+  activeFilter?: FlightCategoryFilter;
   onSelectAircraft: (id: string | null) => void;
   isFollowMode?: boolean;
+  onDisableFollowMode?: () => void;
 }
 
 export default function AircraftLayer({
@@ -24,8 +28,10 @@ export default function AircraftLayer({
   aircraft,
   selectedAircraftId,
   searchQuery = '',
+  activeFilter = 'ALL',
   onSelectAircraft,
   isFollowMode = false,
+  onDisableFollowMode,
 }: AircraftLayerProps) {
   const isLayersAddedRef = useRef<boolean>(false);
   const selectedAircraftRef = useRef<AircraftPosition | null>(null);
@@ -180,6 +186,14 @@ export default function AircraftLayer({
       map.once('styledata', setupLayers);
     }
 
+    // Recover custom layers if basemap style is switched dynamically
+    const handleStyleReload = () => {
+      if (map.isStyleLoaded() && !map.getSource(SOURCE_ID)) {
+        setupLayers();
+      }
+    };
+    map.on('styledata', handleStyleReload);
+
     if (typeof window !== 'undefined') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__aeroloomSelectAircraft = onSelectAircraft;
@@ -199,6 +213,13 @@ export default function AircraftLayer({
       }
     };
 
+    // User manual exploration: if user drags/pans the map, disengage camera follow mode
+    const handleUserDrag = () => {
+      if (isFollowMode) {
+        onDisableFollowMode?.();
+      }
+    };
+
     // Cursor pointer on hover
     const handleMouseEnter = () => {
       map.getCanvas().style.cursor = 'pointer';
@@ -209,30 +230,33 @@ export default function AircraftLayer({
 
     map.on('click', LAYER_UNSELECTED_ID, handleAircraftClick);
     map.on('click', LAYER_SELECTED_ID, handleAircraftClick);
+    map.on('dragstart', handleUserDrag);
     map.on('mouseenter', LAYER_UNSELECTED_ID, handleMouseEnter);
     map.on('mouseleave', LAYER_UNSELECTED_ID, handleMouseLeave);
     map.on('mouseenter', LAYER_SELECTED_ID, handleMouseEnter);
     map.on('mouseleave', LAYER_SELECTED_ID, handleMouseLeave);
 
     return () => {
+      map.off('styledata', handleStyleReload);
       map.off('click', LAYER_UNSELECTED_ID, handleAircraftClick);
       map.off('click', LAYER_SELECTED_ID, handleAircraftClick);
+      map.off('dragstart', handleUserDrag);
       map.off('mouseenter', LAYER_UNSELECTED_ID, handleMouseEnter);
       map.off('mouseleave', LAYER_UNSELECTED_ID, handleMouseLeave);
       map.off('mouseenter', LAYER_SELECTED_ID, handleMouseEnter);
       map.off('mouseleave', LAYER_SELECTED_ID, handleMouseLeave);
     };
-  }, [map, onSelectAircraft]);
+  }, [map, onSelectAircraft, isFollowMode, onDisableFollowMode]);
 
-  // Update GeoJSON source whenever aircraft positions, selection, or search changes
+  // Update GeoJSON source whenever aircraft positions, selection, filter, or search changes
   useEffect(() => {
     if (!map) return;
     const source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
     if (source) {
-      const geojson = aircraftToGeoJson(aircraft, selectedAircraftId, searchQuery);
+      const geojson = aircraftToGeoJson(aircraft, selectedAircraftId, searchQuery, activeFilter);
       source.setData(geojson);
     }
-  }, [map, aircraft, selectedAircraftId, searchQuery]);
+  }, [map, aircraft, selectedAircraftId, searchQuery, activeFilter]);
 
   // Camera follow-mode: pan to aircraft when enabled and position updates
   useEffect(() => {

@@ -67,11 +67,12 @@ export default function ObservatoryHeader({
         <div className="relative">
           <button
             onClick={() => setIsSectorOpen((prev) => !prev)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-xs font-mono text-slate-200 transition-all shadow-xl"
+            className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-[#080d1a]/85 border border-[#1f293d] hover:border-sky-500/50 backdrop-blur-md text-xs font-mono text-slate-200 transition-all shadow-xl"
           >
             <span className="text-slate-500 hidden md:inline">SECTOR:</span>
-            <span className="text-sky-300 font-semibold">{activeSector.label}</span>
-            <span className="text-[10px] text-slate-400">({activeSector.iata})</span>
+            <span className="text-sky-300 font-semibold sm:hidden">{activeSector.iata}</span>
+            <span className="text-sky-300 font-semibold hidden sm:inline">{activeSector.label}</span>
+            <span className="text-[10px] text-slate-400 hidden sm:inline">({activeSector.iata})</span>
             <ChevronDown
               className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
                 isSectorOpen ? 'rotate-180' : ''

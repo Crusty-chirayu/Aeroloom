@@ -46,6 +46,10 @@ export function useLiveAircraft({
   const abortControllerRef = useRef<AbortController | null>(null);
   const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef<boolean>(true);
+  const selectedAircraftIdRef = useRef<string | null>(selectedAircraftId);
+  selectedAircraftIdRef.current = selectedAircraftId;
+  const requestSeqRef = useRef<number>(0);
+  const consecutiveErrorsRef = useRef<number>(0);
 
   // Derive radius from sector zoom (Continental needs larger radius ~250nm, Metro ~100nm)
   const queryRadiusNm = sector.id === 'conus' ? 250 : 120;
@@ -61,6 +65,7 @@ export function useLiveAircraft({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
+    const currentSeq = ++requestSeqRef.current;
     setIsRefreshing(true);
 
     try {
@@ -76,7 +81,7 @@ export function useLiveAircraft({
 
       const json = await res.json();
 
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || currentSeq !== requestSeqRef.current) return;
 
       if (json.success && Array.isArray(json.aircraft)) {
         const list: AircraftPosition[] = json.aircraft;
@@ -85,11 +90,13 @@ export function useLiveAircraft({
         setLastUpdated(new Date());
         setIsStale(false);
         setError(null);
+        consecutiveErrorsRef.current = 0;
 
         // Update selected aircraft data if still present in stream
-        if (selectedAircraftId) {
+        const currentSelId = selectedAircraftIdRef.current;
+        if (currentSelId) {
           const match = list.find(
-            (a) => a.id === selectedAircraftId || a.callsign === selectedAircraftId
+            (a) => a.id === currentSelId || a.callsign === currentSelId
           );
           if (match) {
             setSelectedAircraft(match);
@@ -99,9 +106,10 @@ export function useLiveAircraft({
         // Upstream error or empty fallback
         setError(json.error || 'Empty telemetry stream');
         setIsStale(true);
+        consecutiveErrorsRef.current += 1;
       }
     } catch (err: unknown) {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || currentSeq !== requestSeqRef.current) return;
       if (err instanceof Error && err.name === 'AbortError') {
         // Request was purposefully cancelled (e.g. sector switch), ignore
         return;
@@ -109,15 +117,16 @@ export function useLiveAircraft({
       const msg = err instanceof Error ? err.message : 'Telemetry fetch failed';
       setError(msg);
       setIsStale(true);
+      consecutiveErrorsRef.current += 1;
     } finally {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && currentSeq === requestSeqRef.current) {
         setIsLoading(false);
         setIsRefreshing(false);
       }
     }
-  }, [centerLat, centerLng, queryRadiusNm, enabled, selectedAircraftId]);
+  }, [centerLat, centerLng, queryRadiusNm, enabled]);
 
-  // Synchronize selected aircraft object whenever selectedAircraftId changes
+  // Synchronize selected aircraft object whenever selectedAircraftId or aircraft updates
   useEffect(() => {
     if (!selectedAircraftId) {
       setSelectedAircraft(null);
@@ -133,7 +142,7 @@ export function useLiveAircraft({
     }
   }, [selectedAircraftId, aircraft]);
 
-  // Polling lifecycle loop
+  // Polling lifecycle loop with tab visibility and backoff protection
   useEffect(() => {
     isMountedRef.current = true;
     setIsLoading(true);
@@ -141,17 +150,40 @@ export function useLiveAircraft({
     let isCancelled = false;
 
     const runPoll = async () => {
-      await fetchAircraft();
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        await fetchAircraft();
+      }
       if (!isCancelled && enabled) {
-        timeoutIdRef.current = setTimeout(runPoll, pollIntervalMs);
+        // Apply backoff if consecutive errors occur (6s -> 9s -> 13.5s -> max 30s)
+        const delay = consecutiveErrorsRef.current > 0
+          ? Math.min(Math.round(pollIntervalMs * Math.pow(1.5, consecutiveErrorsRef.current)), 30000)
+          : pollIntervalMs;
+        timeoutIdRef.current = setTimeout(runPoll, delay);
       }
     };
 
     runPoll();
 
+    // Listen to tab visibility changes to resume polling immediately when user returns
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !isCancelled && enabled) {
+        if (timeoutIdRef.current) {
+          clearTimeout(timeoutIdRef.current);
+        }
+        runPoll();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
     return () => {
       isCancelled = true;
       isMountedRef.current = false;
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
       if (timeoutIdRef.current) {
         clearTimeout(timeoutIdRef.current);
       }

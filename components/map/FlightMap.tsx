@@ -27,6 +27,7 @@ export interface MapMetrics {
 
 interface FlightMapProps {
   activeSector?: AviationSector;
+  providerKey?: 'cartoDark' | 'openFreeMapDark';
   onSectorChange?: (sector: AviationSector) => void;
   onMetricsChange?: (metrics: MapMetrics) => void;
   onMapReady?: (map: MapLibreMap) => void;
@@ -35,6 +36,7 @@ interface FlightMapProps {
 
 export default function FlightMap({
   activeSector = MAP_DEFAULTS.initialSector,
+  providerKey,
   onSectorChange,
   onMetricsChange,
   onMapReady,
@@ -43,7 +45,11 @@ export default function FlightMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
 
-  const [activeProviderKey, setActiveProviderKey] = useState<string>('cartoDark');
+  const [internalProviderKey, setInternalProviderKey] = useState<'cartoDark' | 'openFreeMapDark'>('cartoDark');
+  const activeProviderKey = providerKey || internalProviderKey;
+  const prevProviderKeyRef = useRef<string>(activeProviderKey);
+  const prevSectorIdRef = useRef<string>(activeSector.id);
+
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapMetrics, setMapMetrics] = useState<MapMetrics>({
@@ -56,32 +62,32 @@ export default function FlightMap({
   const [isMapReady, setIsMapReady] = useState<boolean>(false);
 
   const activeProvider = BASEMAP_PROVIDERS[activeProviderKey] || BASEMAP_PROVIDERS.cartoDark;
+  const initialSectorRef = useRef<AviationSector>(activeSector);
+  const onMetricsChangeRef = useRef(onMetricsChange);
+  onMetricsChangeRef.current = onMetricsChange;
+  const onMapReadyRef = useRef(onMapReady);
+  onMapReadyRef.current = onMapReady;
 
-  // Initialize MapLibre instance
+  // Initialize MapLibre instance once on mount
   const initMap = useCallback(() => {
-    if (!containerRef.current) return;
-
-    // Clean up previous map if exists
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
+    if (!containerRef.current || mapRef.current) return;
 
     setIsLoading(true);
     setMapError(null);
     setIsMapReady(false);
 
     try {
+      const initSector = initialSectorRef.current;
       const map = new MapLibreMap({
         container: containerRef.current,
         style: activeProvider.styleUrl,
-        center: activeSector.center,
-        zoom: activeSector.zoom,
-        pitch: activeSector.pitch,
-        bearing: activeSector.bearing,
+        center: initSector.center,
+        zoom: initSector.zoom,
+        pitch: initSector.pitch,
+        bearing: initSector.bearing,
         minZoom: MAP_DEFAULTS.minZoom,
         maxZoom: MAP_DEFAULTS.maxZoom,
-        attributionControl: false, // We mount custom styled attribution control
+        attributionControl: false,
         dragRotate: MAP_DEFAULTS.dragRotate,
         touchPitch: MAP_DEFAULTS.touchPitch,
       });
@@ -124,7 +130,7 @@ export default function FlightMap({
           bearing: Number(map.getBearing().toFixed(0)),
         };
         setMapMetrics(metrics);
-        onMetricsChange?.(metrics);
+        onMetricsChangeRef.current?.(metrics);
       };
 
       map.on('move', updateMetrics);
@@ -141,7 +147,7 @@ export default function FlightMap({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__aeroloomMap = map;
         }
-        onMapReady?.(map);
+        onMapReadyRef.current?.(map);
       };
 
       map.on('load', handleReady);
@@ -153,11 +159,10 @@ export default function FlightMap({
       });
 
       // Safety fallback: ensure loading overlay clears even on slow network
-      const loadSafetyTimer = setTimeout(handleReady, 3500);
+      setTimeout(handleReady, 3500);
 
       // Handle tile / style error
       map.on('error', (e: ErrorEvent) => {
-        // Tile 404s/temporary blips shouldn't break whole deck, only fatal style errors
         if (e.error && (e.error.message.includes('style') || e.error.message.includes('WebGL'))) {
           setMapError(`Map Engine Alert: ${e.error.message}`);
           setIsLoading(false);
@@ -170,7 +175,7 @@ export default function FlightMap({
       setMapError(msg);
       setIsLoading(false);
     }
-  }, [activeProvider.styleUrl, activeSector, onMetricsChange]);
+  }, [activeProvider.styleUrl]);
 
   // Initial mount
   useEffect(() => {
@@ -183,6 +188,35 @@ export default function FlightMap({
       }
     };
   }, [initMap]);
+
+  // Smooth camera navigation on sector change without map destruction
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (prevSectorIdRef.current === activeSector.id) return;
+    prevSectorIdRef.current = activeSector.id;
+
+    mapRef.current.flyTo({
+      center: activeSector.center,
+      zoom: activeSector.zoom,
+      pitch: activeSector.pitch,
+      bearing: activeSector.bearing,
+      essential: true,
+      duration: 1600,
+    });
+  }, [activeSector]);
+
+  // Dynamic basemap style change without destroying map instance
+  useEffect(() => {
+    if (!mapRef.current) return;
+    if (prevProviderKeyRef.current === activeProviderKey) return;
+    prevProviderKeyRef.current = activeProviderKey;
+
+    const targetProvider = BASEMAP_PROVIDERS[activeProviderKey];
+    if (targetProvider?.styleUrl) {
+      setIsLoading(true);
+      mapRef.current.setStyle(targetProvider.styleUrl);
+    }
+  }, [activeProviderKey]);
 
   // ResizeObserver for fluid responsive map resizing
   useEffect(() => {
@@ -220,7 +254,7 @@ export default function FlightMap({
   // Toggle basemap between Carto Dark Matter and OpenFreeMap Dark
   const toggleBasemap = () => {
     const nextKey = activeProviderKey === 'cartoDark' ? 'openFreeMapDark' : 'cartoDark';
-    setActiveProviderKey(nextKey);
+    setInternalProviderKey(nextKey);
   };
 
   // Reset camera to active sector

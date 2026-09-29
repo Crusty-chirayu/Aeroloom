@@ -139,6 +139,20 @@ export function getStatusColor(aircraft: AircraftPosition): string {
   return '#38bdf8'; // Aero Cyan standard
 }
 
+export type FlightCategoryFilter = 'ALL' | 'CRUISE' | 'CLIMB' | 'GROUND' | 'EMERGENCY';
+
+/**
+ * Evaluates whether an aircraft matches the tactical category filter
+ */
+export function matchesFlightFilter(ac: AircraftPosition, filter: FlightCategoryFilter): boolean {
+  if (filter === 'ALL') return true;
+  if (filter === 'CRUISE') return ac.altitude >= 18000 && !ac.isGround;
+  if (filter === 'CLIMB') return !!(ac.verticalRate && Math.abs(ac.verticalRate) > 400);
+  if (filter === 'GROUND') return ac.isGround || ac.altitude <= 0;
+  if (filter === 'EMERGENCY') return ac.squawk === '7700' || ac.squawk === '7600' || ac.squawk === '7500';
+  return true;
+}
+
 /**
  * Transforms an array of AircraftPosition records into an Altitude-Strata
  * GeoJSON FeatureCollection with progressive disclosure parameters.
@@ -146,7 +160,8 @@ export function getStatusColor(aircraft: AircraftPosition): string {
 export function aircraftToGeoJson(
   aircraftList: AircraftPosition[],
   selectedId: string | null = null,
-  searchFilter: string = ''
+  searchFilter: string = '',
+  activeFilter: FlightCategoryFilter = 'ALL'
 ): AircraftFeatureCollection {
   if (!Array.isArray(aircraftList)) {
     return { type: 'FeatureCollection', features: [] };
@@ -176,6 +191,12 @@ export function aircraftToGeoJson(
 
     const callsign = (ac.callsign || ac.id || 'UNID').trim().toUpperCase();
     const hex = (ac.id || '').trim().toUpperCase();
+    const isSelected = selectedId !== null && (ac.id === selectedId || callsign === selectedId);
+
+    // Filter by active category filter (preserve selected flight)
+    if (!isSelected && !matchesFlightFilter(ac, activeFilter)) {
+      continue;
+    }
 
     // Search query filter (matches callsign, hex, or registration)
     if (
@@ -190,7 +211,6 @@ export function aircraftToGeoJson(
     const altitude = ac.altitude || 0;
     const isGround = ac.isGround ?? false;
     const strata = classifyAltitudeStrata(altitude, isGround);
-    const isSelected = selectedId !== null && (ac.id === selectedId || callsign === selectedId);
     const isEmergency = ac.squawk === '7700' || ac.squawk === '7600' || ac.squawk === '7500';
     const isClimbingOrDescending = !!(ac.verticalRate && Math.abs(ac.verticalRate) > 400);
 

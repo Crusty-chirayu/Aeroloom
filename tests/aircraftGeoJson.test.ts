@@ -246,5 +246,56 @@ describe('Aircraft GeoJSON & Telemetry Formatter', () => {
     // Reduction ratio: (90 - 30) / 90 = 0.67 (~67% reduction)
     assert.ok(metrics.labelReductionRatio >= 0.65, `Expected >= 65% clutter reduction, got ${metrics.labelReductionRatio}`);
   });
+
+  test('aircraftToGeoJson filters correctly by active category', () => {
+    // CRUISE: should return DAL397 (35000ft)
+    const cruiseGeo = aircraftToGeoJson(MOCK_AIRCRAFT, null, '', 'CRUISE');
+    const cruiseIds = cruiseGeo.features.map((f) => f.properties.callsign);
+    assert.ok(cruiseIds.includes('DAL397'));
+    assert.ok(!cruiseIds.includes('GNDTAXI'));
+
+    // CLIMB: should return JIA5567 (-800 FPM)
+    const climbGeo = aircraftToGeoJson(MOCK_AIRCRAFT, null, '', 'CLIMB');
+    const climbIds = climbGeo.features.map((f) => f.properties.callsign);
+    assert.ok(climbIds.includes('JIA5567'));
+    assert.ok(!climbIds.includes('DAL397'));
+
+    // GROUND: should return GNDTAXI
+    const gndGeo = aircraftToGeoJson(MOCK_AIRCRAFT, null, '', 'GROUND');
+    const gndIds = gndGeo.features.map((f) => f.properties.callsign);
+    assert.ok(gndIds.includes('GNDTAXI'));
+    assert.ok(!gndIds.includes('DAL397'));
+
+    // EMERGENCY: should return DAL397 (squawk 7700)
+    const emgGeo = aircraftToGeoJson(MOCK_AIRCRAFT, null, '', 'EMERGENCY');
+    const emgIds = emgGeo.features.map((f) => f.properties.callsign);
+    assert.strictEqual(emgIds.length, 1);
+    assert.strictEqual(emgIds[0], 'DAL397');
+
+    // Preservation of selected aircraft even when filter does not match
+    const preservedGeo = aircraftToGeoJson(MOCK_AIRCRAFT, 'c45d6e', '', 'CRUISE');
+    const preservedIds = preservedGeo.features.map((f) => f.properties.id);
+    assert.ok(preservedIds.includes('c45d6e'), 'Selected flight should be retained even if it is on the ground');
+  });
+
+  test('emergency squawks 7500, 7600, 7700 assign crimson status color', () => {
+    const baseAircraft: AircraftPosition = {
+      id: 'emg1',
+      callsign: 'EMG1',
+      latitude: 40.0,
+      longitude: -74.0,
+      altitude: 20000,
+      heading: 180,
+      speed: 400,
+      timestamp: Date.now(),
+      source: 'adsb-open',
+      isGround: false,
+    };
+
+    assert.strictEqual(getStatusColor({ ...baseAircraft, squawk: '7700' }), '#ef4444');
+    assert.strictEqual(getStatusColor({ ...baseAircraft, squawk: '7600' }), '#ef4444');
+    assert.strictEqual(getStatusColor({ ...baseAircraft, squawk: '7500' }), '#ef4444');
+    assert.notStrictEqual(getStatusColor({ ...baseAircraft, squawk: '1200' }), '#ef4444');
+  });
 });
 
