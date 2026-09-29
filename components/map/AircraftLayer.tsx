@@ -2,20 +2,25 @@
 
 import { useEffect, useRef } from 'react';
 import type { Map as MapLibreMap, GeoJSONSource, MapMouseEvent } from 'maplibre-gl';
-import type { AircraftPosition } from '@/lib/providers/positions/types';
+import type { AircraftPosition, PositionSample } from '@/lib/providers/positions/types';
 import { aircraftToGeoJson } from '@/lib/map/aircraftGeoJson';
+import { trailToGeoJson } from '@/lib/map/trailGeoJson';
 import { registerAircraftIcons, ICON_IDS } from '@/lib/map/aircraftIcon';
+import type { FlightCategoryFilter } from '@/lib/map/aircraftGeoJson';
 
 const SOURCE_ID = 'aircraft-source';
 const LAYER_UNSELECTED_ID = 'aircraft-layer';
 const LAYER_SELECTED_ID = 'aircraft-selected-layer';
 
-import type { FlightCategoryFilter } from '@/lib/map/aircraftGeoJson';
+const TRAIL_SOURCE_ID = 'aircraft-trail-source';
+const TRAIL_LAYER_ID = 'aircraft-trail-layer';
+const TRAIL_GLOW_LAYER_ID = 'aircraft-trail-glow-layer';
 
 interface AircraftLayerProps {
   map: MapLibreMap | null;
   aircraft: AircraftPosition[];
   selectedAircraftId: string | null;
+  selectedAircraftTrail?: PositionSample[];
   searchQuery?: string;
   activeFilter?: FlightCategoryFilter;
   onSelectAircraft: (id: string | null) => void;
@@ -27,6 +32,7 @@ export default function AircraftLayer({
   map,
   aircraft,
   selectedAircraftId,
+  selectedAircraftTrail,
   searchQuery = '',
   activeFilter = 'ALL',
   onSelectAircraft,
@@ -48,7 +54,53 @@ export default function AircraftLayer({
       // Register custom canvas icons into WebGL sprite atlas
       registerAircraftIcons(map);
 
-      // Check if source already exists
+      // 1. Trail Source and Layers (mounted underneath aircraft symbols)
+      let trailSource = map.getSource(TRAIL_SOURCE_ID) as GeoJSONSource | undefined;
+      const initialTrail = trailToGeoJson(selectedAircraftTrail);
+      if (!trailSource) {
+        map.addSource(TRAIL_SOURCE_ID, {
+          type: 'geojson',
+          data: initialTrail,
+        });
+      }
+
+      if (!map.getLayer(TRAIL_GLOW_LAYER_ID)) {
+        map.addLayer({
+          id: TRAIL_GLOW_LAYER_ID,
+          type: 'line',
+          source: TRAIL_SOURCE_ID,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': '#0284c7',
+            'line-width': 6,
+            'line-opacity': 0.35,
+            'line-blur': 3,
+          },
+        });
+      }
+
+      if (!map.getLayer(TRAIL_LAYER_ID)) {
+        map.addLayer({
+          id: TRAIL_LAYER_ID,
+          type: 'line',
+          source: TRAIL_SOURCE_ID,
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round',
+          },
+          paint: {
+            'line-color': '#38bdf8',
+            'line-width': 2.5,
+            'line-opacity': 0.85,
+            'line-dasharray': [2, 1],
+          },
+        });
+      }
+
+      // 2. Aircraft Marker Source and Layers
       let source = map.getSource(SOURCE_ID) as GeoJSONSource | undefined;
       const initialData = aircraftToGeoJson(aircraft, selectedAircraftId, searchQuery);
 
@@ -257,6 +309,16 @@ export default function AircraftLayer({
       source.setData(geojson);
     }
   }, [map, aircraft, selectedAircraftId, searchQuery, activeFilter]);
+
+  // Update Breadcrumb Trail source whenever selected aircraft trail updates
+  useEffect(() => {
+    if (!map) return;
+    const trailSource = map.getSource(TRAIL_SOURCE_ID) as GeoJSONSource | undefined;
+    if (trailSource) {
+      const trailData = trailToGeoJson(selectedAircraftTrail);
+      trailSource.setData(trailData);
+    }
+  }, [map, selectedAircraftTrail]);
 
   // Camera follow-mode: pan to aircraft when enabled and position updates
   useEffect(() => {
