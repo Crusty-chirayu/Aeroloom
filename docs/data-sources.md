@@ -1,46 +1,93 @@
-# Aeroloom: Data Sources, Tile Attribution & Licensing Terms
+# Aeroloom — Data Sources & Upstream Attribution Register
 
-This document tracks all external data sources, map tile providers, licenses, and attribution requirements across the Aeroloom system.
-
----
-
-## 1. Map Basemap Tile Sources (Phase 0 Evaluation / Phase 3 Finalization)
-
-> **Phase 0 Status**: Dark basemap configurations (`cartoDark`, `openFreeMapDark`) have been removed from the repository. Basemap configuration retains extensible multi-provider structure. The final custom light style will be designed and built in **Phase 3**.
-
-### Candidate 1: OpenFreeMap (Primary Candidate)
-- **Style**: Liberty (`https://tiles.openfreemap.org/styles/liberty`) / Custom Positron/Bright vector tiles.
-- **Provider**: OpenFreeMap (open-source vector tile hosting).
-- **Terms & Limits**: Free, no API key required, no tracking, open infrastructure.
-- **License**: Map data is licensed under the [Open Database License (ODbL)](https://opendatacommons.org/licenses/odbl/) by the OpenStreetMap Foundation.
-- **Attribution Requirement**: Must display `© OpenStreetMap contributors, © OpenFreeMap` prominently in the map viewport attribution control.
-
-### Candidate 2: CARTO Positron (Fallback / Reference Candidate)
-- **Style**: Positron GL Style (`https://basemaps.cartocdn.com/gl/positron-gl-style/style.json`).
-- **Provider**: CARTO.
-- **Terms & Limits**: Free for non-commercial and direct visualization use with standard attribution.
-- **License**: Cartography & raster/vector design under [Creative Commons Attribution 4.0 International (CC-BY 4.0)](https://creativecommons.org/licenses/by/4.0/). Underlying data © OpenStreetMap contributors (ODbL).
-- **Attribution Requirement**: Must display `© CARTO, © OpenStreetMap contributors`.
+This document registers every third-party data provider, telemetry stream, and tile service integrated into Aeroloom, including verified endpoints, licensing terms, rate limits, commercial usage rights, and required UI attributions.
 
 ---
 
-## 2. Flight Position & ADS-B Telemetry
+## 1. Live Flight Telemetry: airplanes.live
 
-### airplanes.live & adsb.lol
-- **Provider**: Community ADS-B feed aggregator network.
-- **Integration**: Server-side Next.js route handlers (`app/api/aircraft/live/route.ts`), debounced with in-memory / Redis cache layers and circuit breaker.
-- **Terms & Usage**: Non-commercial community access; strict rate-limiting shields on client proxies to ensure 1 upstream request per geographic cluster.
-- **Honest Data Policy**: No simulated, fake, or synthetic coordinates are presented as live flights. If the feed is unreachable, stale counters or honest delayed indicators are displayed.
+| Property | Detail |
+|---|---|
+| **Primary URL** | `https://api.airplanes.live/v2/` |
+| **Active Endpoints** | `/point/{lat}/{lon}/{radius}` (spatial queries), `/hex/{hex}` (aircraft telemetry & history), `/callsign/{callsign}` (flight search) |
+| **Function in Aeroloom** | Primary live ADS-B telemetry provider for airborne and ground positions, ground speed, track, barometric altitude, and squawk. |
+| **Rate Limits** | Fair-use public tier. Recommends ≥2–5 second polling intervals per client. Exceeded thresholds return `contact@airplanes.live` challenge. |
+| **Server Mitigation** | Aeroloom employs an Upstash Redis/Memory 5-second cache, request coalescing (collapsing simultaneous bounds requests into 1 upstream call), and bounds quantization to minimize upstream load. |
+| **Terms & Licensing** | Volunteer-operated ADS-B feeder collective. Free for open-source, non-commercial, personal, and research applications. High-volume commercial usage requires a dedicated feeder or contractual agreement. |
+| **Commercial Use** | **Restricted / Clarification Required**: Free for community/non-commercial tiers. Commercial deployment requires prior written consent or hosting private receiver nodes. |
+| **Required Attribution** | "Flight data courtesy of airplanes.live community feeders." Rendered on `/about/data` and product footnotes. |
 
 ---
 
-## 3. Aviation Metadata & Airports
+## 2. Live Flight Telemetry Failover: adsb.lol
 
-### Airport Catalog (`lib/airports/airportData.ts`)
-- Curated reference dataset of 42+ primary global hubs, coordinates, ICAO/IATA identifiers, elevation, and timezones based on public aviation documentation (OurAirports / FAA / ICAO open public domain).
+| Property | Detail |
+|---|---|
+| **Primary URL** | `https://api.adsb.lol/v2/` |
+| **Active Endpoints** | `/point/{lat}/{lon}/{radius}`, `/hex/{hex}`, `/callsign/{callsign}` |
+| **Function in Aeroloom** | Automated secondary failover provider in `ChainedFlightProvider`. Engaged if `airplanes.live` returns HTTP 5xx, network timeout, or rate-limit challenge. |
+| **Rate Limits** | Community fair use. Server-side caching (5 s TTL) and coalescing strictly applied. |
+| **Terms & Licensing** | Open-source community ADS-B aggregation network. Dedicated to unencumbered open aviation data. |
+| **Commercial Use** | Permissible under fair-use guidelines for community and educational applications. Commercial reselling requires running feeder infrastructure. |
+| **Required Attribution** | "ADS-B telemetry aggregated via adsb.lol open collective." |
 
-### Aircraft Type Catalog (`lib/metadata/aircraftCatalog.ts`)
-- Curated ICAO type-designator mapping based on official ICAO Doc 8643 (Aircraft Type Designators).
+---
 
-### Airline Telephony Catalog (`lib/metadata/airlineCatalog.ts`)
-- ICAO 3-letter airline telephony designator mappings derived from ICAO Doc 8585.
+## 3. Aviation Meteorological Data: aviationweather.gov (NOAA / NWS)
+
+| Property | Detail |
+|---|---|
+| **Primary URL** | `https://aviationweather.gov/api/data/` |
+| **Active Endpoints** | `/metar?ids={icao}&format=json` |
+| **Function in Aeroloom** | Official aviation weather observations (METAR), wind velocity, cloud ceiling, barometric altimeter, temperature, and flight category (VFR / MVFR / IFR / LIFR). |
+| **Rate Limits** | Public US government service. No authentication token required. Cached at 60 seconds per station on Aeroloom servers (routine METARs issue hourly or half-hourly). |
+| **Terms & Licensing** | **Public Domain** (US Federal Government work under 17 U.S.C. § 105). |
+| **Commercial Use** | **Unrestricted / Fully Permitted**: Open for worldwide commercial and non-commercial utilization without licensing fees. |
+| **Required Attribution** | "Aviation meteorological observations provided by NOAA / National Weather Service." |
+
+---
+
+## 4. Basemap Cartography: OpenFreeMap & OpenStreetMap
+
+| Property | Detail |
+|---|---|
+| **Primary URL** | `https://tiles.openfreemap.org` / `https://demotiles.maplibre.org` |
+| **Function in Aeroloom** | Clean, light-themed vector basemap tiles rendered via MapLibre GL JS without vendor lock-in or proprietary tokens. |
+| **Rate Limits** | Free public hosting tier funded by community sponsors. Zero API keys. |
+| **Terms & Licensing** | Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), licensed under the Open Database License (ODbL). |
+| **Commercial Use** | **Permitted** under ODbL compliance (proper copyright display and share-alike for database modifications). |
+| **Required Attribution** | `© OpenStreetMap contributors` — must be visibly and tastefully displayed on all map surfaces. |
+
+---
+
+## 5. Precipitation Radar (Optional Layer): RainViewer
+
+| Property | Detail |
+|---|---|
+| **Primary URL** | `https://api.rainviewer.com/public/weather-maps.json` |
+| **Function in Aeroloom** | Weather radar reflectivity overlay for convective storm tracking. |
+| **Rate Limits** | Public free tier for non-commercial web apps. |
+| **Terms & Licensing** | Free API tier requires clear, unmodified branding and link back to RainViewer. |
+| **Commercial Use** | Commercial plans require RainViewer API subscription. |
+| **Required Attribution** | "Radar imagery © RainViewer." |
+
+---
+
+## 6. Curated Static Databases (Zero Network Dependency)
+
+| Dataset | Contents | Source & Licensing |
+|---|---|---|
+| **`lib/airports/airportData.ts`** | Global hub airports (ICAO, IATA, coordinates, elevation, timezone) | Curated open aviation database (public domain) |
+| **`lib/metadata/airlineCatalog.ts`** | Commercial airlines, ICAO 3-letter codes, telephony callsigns | OpenFlights Airline Dataset & ICAO Document 8585 |
+| **`lib/metadata/aircraftCatalog.ts`** | Aircraft type designators, wake turbulence categories, engine types | ICAO Document 8643 Aircraft Type Designators |
+| **`lib/routes/routeResolver.ts`** | Airline route schedules for authentic flight origin/destination | Curated schedule index with explicit "verified" confidence flags |
+
+---
+
+## Summary of Architectural Protections
+
+1. **No Client-Side Upstream Calls**: Browsers **never** call external APIs directly. Every query routes through Next.js server route handlers (`/api/*`).
+2. **Double-Layer Caching**: In-memory LRU + Upstash Redis cache shields upstream APIs from duplicate traffic.
+3. **Request Coalescing**: `RequestCoalescer` merges simultaneous identical bounds or flight requests into a single in-flight Promise.
+4. **Bounds Quantization**: Map viewports are gridded to 0.05° tiles, ensuring multiple users in the same metropolitan area hit identical cache slots.
+5. **Circuit Breakers & Graceful Degradation**: Upstream failures automatically serve cached data with `degraded: true` and trigger short negative caches to prevent upstream hammering.

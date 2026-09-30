@@ -1,173 +1,241 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getLiveAircraftPositions,
-  fetchAirplanesLivePositions,
-  fetchAdsbOpenPositions,
   DEFAULT_QUERY_LOCATION,
 } from '@/lib/providers/positions/airplanesLive';
-import type { ProviderResponse } from '@/lib/providers/positions/types';
-import { enrichAircraftPositions } from '@/lib/providers/enrichment';
-
 import {
   validateSpatialQuery,
 } from '@/lib/providers/positions/validation';
+import { getCacheService, globalCoalescer, globalRateLimiter } from '@/lib/cache';
+import { getDefaultFlightProvider } from '@/lib/providers/chainedFlightProvider';
+import { AirplanesLiveProvider } from '@/lib/providers/airplanesLiveProvider';
+import { AdsbLolProvider } from '@/lib/providers/adsbLolProvider';
+import type { Bounds, AircraftState, FlightProvider } from '@/lib/providers/types';
+import { quantizeBounds, getBoundsCacheKey } from '@/lib/providers/quantization';
+import { toAircraftPosition } from '@/lib/providers/types';
 
-// Rate limiting and server-side cache with bounded size
-interface CacheEntry {
-  response: ProviderResponse;
+const POSITIVE_CACHE_TTL_SEC = 5; // 5 seconds TTL per spec
+const NEGATIVE_CACHE_TTL_SEC = 3;
+
+interface CachedPayload {
+  success: boolean;
+  aircraft: ReturnType<typeof toAircraftPosition>[];
+  states: AircraftState[];
+  totalFound: number;
   timestamp: number;
-  isError?: boolean;
-}
-
-const queryCache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 6000; // 6 seconds positive cache
-const ERROR_CACHE_TTL_MS = 3000; // 3 seconds negative cache for upstream failure circuit-breaking
-const MAX_CACHE_ENTRIES = 120;
-
-function pruneCache(now: number) {
-  if (queryCache.size <= MAX_CACHE_ENTRIES) return;
-  // Remove expired entries first
-  for (const [key, entry] of queryCache.entries()) {
-    const ttl = entry.isError ? ERROR_CACHE_TTL_MS : CACHE_TTL_MS;
-    if (now - entry.timestamp > ttl) {
-      queryCache.delete(key);
-    }
-  }
-  // If still oversized, drop oldest entries
-  if (queryCache.size > MAX_CACHE_ENTRIES) {
-    const keysToDelete = Array.from(queryCache.keys()).slice(0, 30);
-    for (const key of keysToDelete) {
-      queryCache.delete(key);
-    }
-  }
+  provider: string;
+  cached?: boolean;
+  degraded?: boolean;
+  error?: string;
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const providerParam = searchParams.get('provider'); // 'airplanes.live' | 'adsb-open' | 'auto'
+  // 1. IP Rate Limiting (120 req / minute per client)
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip') ||
+    '127.0.0.1';
 
-  const rawLat = searchParams.get('lat');
-  const rawLon = searchParams.get('lon');
-  const rawRadius = searchParams.get('radius');
-
-  // Strict WGS84 and bounds validation via shared validator
-  const validation = validateSpatialQuery(
-    rawLat,
-    rawLon,
-    rawRadius,
-    DEFAULT_QUERY_LOCATION.lat,
-    DEFAULT_QUERY_LOCATION.lon,
-    DEFAULT_QUERY_LOCATION.radiusNm
-  );
-
-  if (!validation.valid) {
+  const rateCheck = globalRateLimiter.check(clientIp, 120, 60000);
+  if (!rateCheck.allowed) {
     return NextResponse.json(
       {
         success: false,
-        error: validation.error,
+        error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
         timestamp: Date.now(),
         aircraft: [],
         totalFound: 0,
-        provider: 'aeroloom-validator',
       },
-      { status: 400 }
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil(rateCheck.resetMs / 1000).toString(),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
     );
   }
 
-  const { lat, lon, radiusNm } = validation;
+  const { searchParams } = new URL(request.url);
+  const providerParam = searchParams.get('provider'); // 'airplanes.live' | 'adsb-open' | 'auto'
+  const boundsParam = searchParams.get('bounds'); // 'south,west,north,east'
+  const zoomParam = searchParams.get('zoom');
+  const zoom = zoomParam ? parseFloat(zoomParam) : 10;
 
-  const cacheKey = `${providerParam || 'auto'}_${lat.toFixed(2)}_${lon.toFixed(2)}_${radiusNm.toFixed(0)}`;
+  let bounds: Bounds;
+
+  if (boundsParam) {
+    const parts = boundsParam.split(',').map((p) => parseFloat(p.trim()));
+    if (parts.length === 4 && parts.every((n) => !isNaN(n))) {
+      bounds = {
+        south: Math.max(-90, parts[0]),
+        west: Math.max(-180, parts[1]),
+        north: Math.min(90, parts[2]),
+        east: Math.min(180, parts[3]),
+        zoom,
+      };
+    } else {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Invalid bounds parameter. Format must be south,west,north,east in decimal degrees.',
+          timestamp: Date.now(),
+          aircraft: [],
+          totalFound: 0,
+        },
+        { status: 400 }
+      );
+    }
+  } else {
+    // Legacy lat/lon/radius support
+    const rawLat = searchParams.get('lat');
+    const rawLon = searchParams.get('lon');
+    const rawRadius = searchParams.get('radius');
+
+    const validation = validateSpatialQuery(
+      rawLat,
+      rawLon,
+      rawRadius,
+      DEFAULT_QUERY_LOCATION.lat,
+      DEFAULT_QUERY_LOCATION.lon,
+      DEFAULT_QUERY_LOCATION.radiusNm
+    );
+
+    if (!validation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: validation.error,
+          timestamp: Date.now(),
+          aircraft: [],
+          totalFound: 0,
+          provider: 'aeroloom-validator',
+        },
+        { status: 400 }
+      );
+    }
+
+    const { lat, lon, radiusNm } = validation;
+    const latDelta = radiusNm / 60;
+    const lonDelta = radiusNm / (60 * Math.max(0.1, Math.cos((lat * Math.PI) / 180)));
+
+    bounds = {
+      south: Math.max(-90, lat - latDelta),
+      north: Math.min(90, lat + latDelta),
+      west: Math.max(-180, lon - lonDelta),
+      east: Math.min(180, lon + lonDelta),
+      zoom,
+    };
+  }
+
+  // 2. Quantize bounds for shared cache keys among nearby users
+  const quantized = quantizeBounds(bounds, zoom);
+  const cacheKey = `live_${providerParam || 'auto'}_${getBoundsCacheKey(quantized, zoom)}`;
+  const cache = getCacheService();
   const now = Date.now();
-  pruneCache(now);
 
-  const cached = queryCache.get(cacheKey);
-
-  // If positive cache is fresh, return cached response
-  if (cached && !cached.isError && now - cached.timestamp < CACHE_TTL_MS) {
+  // 3. Check Cache
+  const cachedData = await cache.get<CachedPayload>(cacheKey);
+  if (cachedData && cachedData.success) {
     return NextResponse.json(
       {
-        ...cached.response,
+        ...cachedData,
         cached: true,
-        cacheAgeMs: now - cached.timestamp,
+        cacheAgeMs: now - cachedData.timestamp,
       },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
-          'X-Data-Source': cached.response.provider || 'aeroloom-cache',
-          'X-Aeroloom-Version': '0.1.0',
+          'X-Data-Source': cachedData.provider || 'aeroloom-cache',
+          'X-RateLimit-Remaining': rateCheck.remaining.toString(),
         },
       }
     );
   }
 
-  // If negative cache is fresh, circuit-break upstream hammering
-  if (cached && cached.isError && now - cached.timestamp < ERROR_CACHE_TTL_MS) {
-    return NextResponse.json(
-      {
-        ...cached.response,
-        cached: true,
-        circuitBreakerActive: true,
-        cacheAgeMs: now - cached.timestamp,
-      },
-      {
-        status: 503,
-        headers: {
-          'Cache-Control': 'no-store',
-          'Retry-After': '3',
-          'X-Aeroloom-CircuitBreaker': 'tripped',
-        },
-      }
-    );
-  }
-
-  let result: ProviderResponse;
-
+  // 4. Request Coalescing: concurrent identical requests join the same in-flight Promise
   try {
-    if (providerParam === 'airplanes.live') {
-      result = await fetchAirplanesLivePositions({ lat, lon, radiusNm });
-    } else if (providerParam === 'adsb-open') {
-      result = await fetchAdsbOpenPositions({ lat, lon, radiusNm });
-    } else {
-      result = await getLiveAircraftPositions({ lat, lon, radiusNm });
-    }
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Unknown upstream error';
-    result = {
-      success: false,
-      aircraft: [],
-      timestamp: now,
-      totalFound: 0,
-      provider: 'upstream-failed',
-      error: errorMsg,
-    };
-  }
+    const payload = await globalCoalescer.execute<CachedPayload>(cacheKey, async () => {
+      let provider: FlightProvider;
+      if (providerParam === 'airplanes.live') {
+        provider = new AirplanesLiveProvider();
+      } else if (providerParam === 'adsb-open' || providerParam === 'adsb.lol') {
+        provider = new AdsbLolProvider();
+      } else {
+        provider = getDefaultFlightProvider();
+      }
 
-  // Enrich aircraft with authentic metadata, operator details, and verified routes
-  if (result.success && result.aircraft.length > 0) {
-    result = {
-      ...result,
-      aircraft: enrichAircraftPositions(result.aircraft),
-    };
-  }
+      const states = await provider.getAircraftInBounds(quantized);
+      const reqTime = Date.now();
 
-  if (result.success) {
-    queryCache.set(cacheKey, { response: result, timestamp: now, isError: false });
-    return NextResponse.json(result, {
+      // Compute ageSeconds for each aircraft
+      const enrichedStates = states.map((s) => ({
+        ...s,
+        ageSeconds: Math.max(0, Math.round((reqTime - s.updatedAt) / 1000)),
+      }));
+
+      // Backward compatible aircraft list
+      const legacyAircraft = enrichedStates.map(toAircraftPosition);
+
+      const result: CachedPayload = {
+        success: true,
+        states: enrichedStates,
+        aircraft: legacyAircraft,
+        totalFound: enrichedStates.length,
+        timestamp: reqTime,
+        provider: provider.name,
+      };
+
+      await cache.set(cacheKey, result, POSITIVE_CACHE_TTL_SEC);
+      return result;
+    });
+
+    return NextResponse.json(payload, {
       headers: {
         'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
-        'X-Data-Source': result.provider || 'adsb-composite',
-        'X-Aeroloom-Version': '0.1.0',
+        'X-Data-Source': payload.provider,
+        'X-RateLimit-Remaining': rateCheck.remaining.toString(),
       },
     });
-  } else {
-    // Record negative cache entry to protect upstream
-    queryCache.set(cacheKey, { response: result, timestamp: now, isError: true });
-    return NextResponse.json(result, {
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : 'Upstream provider failure';
+
+    // 5. Honest degraded fallback: if we have any stale cached data for this key, return it with degraded: true
+    if (cachedData) {
+      return NextResponse.json(
+        {
+          ...cachedData,
+          cached: true,
+          degraded: true,
+          warning: 'Live feed delayed; serving last-known cached airspace snapshot',
+        },
+        {
+          status: 200,
+          headers: {
+            'Cache-Control': 'no-store',
+            'X-Aeroloom-Degraded': 'true',
+          },
+        }
+      );
+    }
+
+    // Negative cache to protect upstream
+    const failedPayload: CachedPayload = {
+      success: false,
+      aircraft: [],
+      states: [],
+      totalFound: 0,
+      timestamp: now,
+      provider: 'upstream-failed',
+      error: errorMsg,
+      degraded: true,
+    };
+    await cache.set(cacheKey, failedPayload, NEGATIVE_CACHE_TTL_SEC);
+
+    return NextResponse.json(failedPayload, {
       status: 502,
       headers: {
         'Cache-Control': 'no-store',
-        'X-Data-Source': result.provider || 'upstream-failed',
-        'X-Aeroloom-Version': '0.1.0',
+        'X-Aeroloom-Degraded': 'true',
       },
     });
   }
