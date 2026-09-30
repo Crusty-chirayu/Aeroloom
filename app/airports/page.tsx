@@ -2,24 +2,17 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import {
-  Building2,
-  Search,
-  ArrowLeft,
-  MapPin,
-  Compass,
-  Crosshair,
-  ExternalLink,
-  Plane,
-} from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { Input } from '@/components/ui/Input';
+import { Panel } from '@/components/ui/Panel';
 import { GLOBAL_AIRPORTS } from '@/lib/airports/airportData';
-import type { AirportInfo } from '@/lib/providers/positions/types';
 
 export default function AirportsDirectoryPage() {
   const [search, setSearch] = useState('');
   const [selectedCountry, setSelectedCountry] = useState<string>('ALL');
 
-  // Extract unique countries
   const countries = useMemo(() => {
     const set = new Set<string>();
     GLOBAL_AIRPORTS.forEach((a) => {
@@ -28,7 +21,6 @@ export default function AirportsDirectoryPage() {
     return Array.from(set).sort();
   }, []);
 
-  // Filtered airports
   const filteredAirports = useMemo(() => {
     const term = search.trim().toUpperCase();
     return GLOBAL_AIRPORTS.filter((a) => {
@@ -46,145 +38,110 @@ export default function AirportsDirectoryPage() {
   }, [search, selectedCountry]);
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 font-sans selection:bg-sky-500/30">
-      {/* Sticky Atmospheric Header */}
-      <header className="sticky top-0 z-30 border-b border-[#1f293d]/80 bg-[#080d1a]/85 backdrop-blur-xl px-4 py-3 sm:px-8 flex items-center justify-between font-mono">
+    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+      {/* Header */}
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/90 backdrop-blur-md px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>OBSERVATORY</span>
+          <Link href="/">
+            <Button variant="ghost" size="sm" icon="arrow-left">
+              Home
+            </Button>
           </Link>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-bold tracking-widest text-white uppercase">AEROLOOM</span>
-            <span className="text-slate-600 font-light">/</span>
-            <span className="text-xs text-sky-400 font-semibold uppercase tracking-wider">
-              AIRPORT DIRECTORY
-            </span>
+            <span className="font-serif text-lg text-[var(--ink)]">Aeroloom</span>
+            <span className="text-[var(--ink-4)]">/</span>
+            <span className="mono-label text-[11px] text-[var(--ink-2)]">Airports Directory</span>
           </div>
         </div>
 
-        <Link
-          href="/dashboard"
-          className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
-        >
-          DASHBOARD
+        <Link href="/dev/kit">
+          <Button variant="outline" size="sm" icon="layers">
+            Kit
+          </Button>
         </Link>
       </header>
 
-      {/* Main Directory Body */}
-      <main className="max-w-6xl mx-auto px-4 py-8 sm:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono">
+      {/* Main Content */}
+      <main className="max-w-[1360px] mx-auto px-6 py-10 space-y-8">
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 border-b border-[var(--line)] pb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-wide flex items-center gap-2.5">
-              <Building2 className="w-7 h-7 text-sky-400" />
-              GLOBAL AVIATION HUBS
+            <h1 className="font-serif text-4xl md:text-5xl text-[var(--ink)] tracking-tight">
+              Global Aviation Hubs
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Curated international gateways, metropolitan corridors, and regional airspaces ({filteredAirports.length} indexed).
+            <p className="text-sm text-[var(--ink-3)] mt-2">
+              Curated international gateways, metropolitan corridors, and regional hubs ({filteredAirports.length} indexed).
             </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-800/80 text-sky-300">
-              ZERO-API CACHED DATASET
-            </span>
-          </div>
+          <Chip variant="neutral" dot>{GLOBAL_AIRPORTS.length} Curated Airspaces</Chip>
         </div>
 
-        {/* Search & Country Filter Controls */}
-        <div className="p-4 rounded-2xl bg-[#080d1a] border border-[#1f293d] flex flex-col sm:flex-row gap-3 font-mono text-xs">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-sky-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="Search by IATA, ICAO, name, or city (e.g. JFK, EGLL, Tokyo)..."
+        {/* Filters */}
+        <div className="flex flex-col sm:flex-row gap-4 items-center">
+          <div className="w-full sm:max-w-md">
+            <Input
+              icon="search"
+              placeholder="Filter by IATA, ICAO, city, or name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#040711] border border-slate-800 text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500/60"
+              clearable
+              onClear={() => setSearch('')}
             />
           </div>
-
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedCountry}
-              onChange={(e) => setSelectedCountry(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-[#040711] border border-slate-800 text-slate-200 focus:outline-none focus:border-sky-500/60"
-            >
-              <option value="ALL">All Countries ({countries.length})</option>
-              {countries.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={selectedCountry}
+            onChange={(e) => setSelectedCountry(e.target.value)}
+            className="h-10 px-3.5 rounded-[var(--r-md)] bg-[var(--surface)] border border-[var(--line-strong)] text-sm font-sans text-[var(--ink)] focus:outline-none focus:border-[var(--signal)] focus:ring-1 focus:ring-[var(--signal)]"
+          >
+            <option value="ALL">All Countries ({countries.length})</option>
+            {countries.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Airport Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-mono">
+        {/* Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAirports.map((airport) => (
-            <div
-              key={airport.icao}
-              className="p-5 rounded-2xl bg-[#080d1a] border border-[#1f293d] hover:border-sky-500/50 transition-all flex flex-col justify-between gap-4 group"
-            >
+            <Panel key={airport.icao} variant="surface" radius="md" padding="md" className="flex flex-col justify-between gap-4 hover:border-[var(--ink-3)] transition-all">
               <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl font-bold text-white group-hover:text-sky-300 transition-colors">
-                        {airport.iata}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
+                      <span className="font-mono text-xl font-bold text-[var(--ink)]">{airport.iata}</span>
+                      <span className="font-mono text-xs px-1.5 py-0.5 rounded-[var(--r-sm)] bg-[var(--paper-2)] text-[var(--ink-3)]">
                         {airport.icao}
                       </span>
                     </div>
-                    <span className="text-xs text-sky-400 font-semibold block mt-0.5">
+                    <span className="text-xs font-medium text-[var(--signal-ink)] block mt-0.5">
                       {airport.city}, {airport.country}
                     </span>
                   </div>
-
-                  <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
-                    <Building2 className="w-4 h-4" />
+                  <div className="w-8 h-8 rounded-full bg-[var(--paper-2)] flex items-center justify-center text-[var(--ink-2)]">
+                    <Icon name="map-pin" size={14} />
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-300 font-sans line-clamp-1">
-                  {airport.name}
-                </p>
+                <p className="text-sm text-[var(--ink-2)] line-clamp-1">{airport.name}</p>
 
-                <div className="pt-2 border-t border-[#1f293d]/80 flex items-center justify-between text-[10px] text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-slate-500" />
-                    {airport.latitude.toFixed(3)}°, {airport.longitude.toFixed(3)}°
-                  </span>
-                  {airport.elevationFt && (
-                    <span>ELEV: {airport.elevationFt.toLocaleString()} FT</span>
-                  )}
+                <div className="pt-2 border-t border-[var(--line)] flex items-center justify-between font-mono text-[11px] text-[var(--ink-3)]">
+                  <span>{airport.latitude.toFixed(2)}°, {airport.longitude.toFixed(2)}°</span>
+                  {airport.elevationFt && <span>ELEV: {airport.elevationFt} FT</span>}
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#1f293d]/60 text-xs">
-                <Link
-                  href={`/airport/${airport.iata.toLowerCase()}`}
-                  className="flex-1 py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-center transition-colors flex items-center justify-center gap-1"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  <span>DETAILS</span>
+              <div className="pt-2 border-t border-[var(--line)] flex items-center gap-2">
+                <Link href={`/airport/${airport.iata.toLowerCase()}`} className="flex-1">
+                  <Button variant="outline" size="sm" className="w-full">
+                    Details
+                  </Button>
                 </Link>
-
-                <Link
-                  href={`/?stage=observatory&select=${airport.iata.toLowerCase()}`}
-                  className="flex-1 py-1.5 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-center transition-colors flex items-center justify-center gap-1 font-semibold"
-                >
-                  <Crosshair className="w-3 h-3" />
-                  <span>RADAR</span>
+                <Link href={`/map?airport=${airport.iata.toLowerCase()}`} className="flex-1">
+                  <Button variant="ghost" size="sm" icon="compass" className="w-full">
+                    Radar
+                  </Button>
                 </Link>
               </div>
-            </div>
+            </Panel>
           ))}
         </div>
       </main>

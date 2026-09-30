@@ -22,7 +22,7 @@ export const ICON_IDS = {
  */
 function createAircraftImageData(
   primaryColor: string,
-  strokeColor: string = '#080b11',
+  strokeColor: string = '#0E1116',
   isSelected: boolean = false
 ): ImageData {
   const size = 64;
@@ -131,7 +131,7 @@ export function registerAircraftIcons(map: MapLibreMap): void {
   for (const { id, color, selected } of icons) {
     if (!map.hasImage(id)) {
       try {
-        const imgData = createAircraftImageData(color, '#080b11', selected);
+        const imgData = createAircraftImageData(color, '#0E1116', selected);
         map.addImage(id, imgData, { pixelRatio: 2 });
       } catch (e) {
         console.error(`Failed to register icon ${id}:`, e);

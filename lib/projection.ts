@@ -1,5 +1,15 @@
-import * as THREE from 'three';
 import { DEFAULT_QUERY_LOCATION } from './providers/positions/airplanesLive.ts';
+
+export class Vector3 {
+  x: number;
+  y: number;
+  z: number;
+  constructor(x: number = 0, y: number = 0, z: number = 0) {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+  }
+}
 
 /**
  * Decorative Cartesian Radar Projection
@@ -17,7 +27,7 @@ export function projectGeoToTerrain(
   altFt: number = 0,
   centerLat: number = DEFAULT_QUERY_LOCATION.lat,
   centerLon: number = DEFAULT_QUERY_LOCATION.lon
-): THREE.Vector3 {
+): Vector3 {
   // Delta in degrees
   const dLat = lat - centerLat;
   const dLon = lon - centerLon;
@@ -39,5 +49,5 @@ export function projectGeoToTerrain(
   const normalizedAlt = Math.max(0, Math.min(45000, altFt)) / 45000;
   const y = 2.2 + normalizedAlt * 3.2;
 
-  return new THREE.Vector3(x, y, z);
+  return new Vector3(x, y, z);
 }

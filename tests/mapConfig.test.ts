@@ -25,18 +25,17 @@ describe('MapLibre configuration & sector validation', () => {
     }
   });
 
-  test('default basemap provider is CARTO Dark Matter with OpenStreetMap attribution', () => {
-    const defaultProvider = BASEMAP_PROVIDERS.cartoDark;
-    assert.ok(defaultProvider, 'cartoDark must exist');
+  test('default basemap provider is configured with OpenStreetMap attribution', () => {
+    const defaultProvider = BASEMAP_PROVIDERS.lightPrimary;
+    assert.ok(defaultProvider, 'lightPrimary must exist');
     assert.strictEqual(defaultProvider.isDefault, true);
-    assert.ok(defaultProvider.attribution.includes('CARTO'));
     assert.ok(defaultProvider.attribution.includes('OpenStreetMap'));
   });
 
-  test('fallback basemap provider is OpenFreeMap Dark', () => {
-    const ofm = BASEMAP_PROVIDERS.openFreeMapDark;
-    assert.ok(ofm, 'openFreeMapDark must exist');
-    assert.ok(ofm.attribution.includes('OpenFreeMap'));
+  test('fallback basemap provider is configured with valid attribution', () => {
+    const fallback = BASEMAP_PROVIDERS.lightFallback;
+    assert.ok(fallback, 'lightFallback must exist');
+    assert.ok(fallback.attribution.includes('OpenStreetMap') || fallback.attribution.includes('CARTO'));
   });
 
   test('all aviation sectors have valid WGS84 coordinates and zoom levels', () => {

@@ -1,72 +1,136 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
+@import "./tokens.css";
 
-:root {
-  --background: #080b11;
-  --foreground: #f8fafc;
+/* ==========================================================================
+   BASE BODY & DOCUMENT
+   ========================================================================== */
 
-  /* Aeroloom Design System Tokens */
-  --canvas-bg: #080b11;
-  --deck-bg: #0f141f;
-  --panel-bg: rgba(15, 20, 31, 0.92);
-  --panel-border: #1f293d;
-  --panel-border-subtle: #151d2c;
+*, *::before, *::after { box-sizing: border-box; }
 
-  --accent-cyan: #0284c7;
-  --accent-cyan-light: #38bdf8;
-  --accent-cyan-subtle: rgba(56, 189, 248, 0.12);
-
-  --status-emerald: #10b981;
-  --status-amber: #f59e0b;
-  --status-crimson: #ef4444;
-
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--canvas-bg);
-  color: var(--text-primary);
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   margin: 0;
   padding: 0;
-  -webkit-font-smoothing: antialiased;
+  /* Paper grain at 3% — generated SVG feTurbulence filter */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
 }
 
-/* Custom Tactical Scrollbars */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+/* ==========================================================================
+   TYPOGRAPHY — Base scale
+   ========================================================================== */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-instrument-serif), Georgia, serif;
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+  color: var(--ink);
+  margin: 0;
 }
-::-webkit-scrollbar-track {
-  background: #080b11;
+
+p { margin: 0; }
+
+a {
+  color: var(--signal-ink);
+  text-decoration: none;
 }
-::-webkit-scrollbar-thumb {
-  background: #1f293d;
+
+a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Mono label class */
+.mono-label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: var(--text-micro);
+  font-weight: 500;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ==========================================================================
+   FOCUS RING — 2px signal, 2px offset (global)
+   ========================================================================== */
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
   border-radius: 2px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #38bdf8;
+
+/* ==========================================================================
+   CUSTOM SCROLLBARS — warm-toned, minimal
+   ========================================================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-/* MapLibre Tactical Dark Overrides */
+::-webkit-scrollbar-track {
+  background: var(--paper-2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: var(--r-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
+
+/* ==========================================================================
+   REDUCED MOTION — global fallback
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ==========================================================================
+   MAPLIBRE GL — Light theme overrides
+   Phase 3 will wire the actual light basemap; these ensure controls look
+   correct on the --paper background once the map is built.
+   ========================================================================== */
+
 .maplibregl-ctrl-group {
-  background-color: rgba(15, 20, 31, 0.9) !important;
-  border: 1px solid #1f293d !important;
-  border-radius: 8px !important;
+  background-color: var(--surface) !important;
+  border: 1px solid var(--line-strong) !important;
+  border-radius: var(--r-sm) !important;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(8px);
+  box-shadow: var(--sh-1) !important;
 }
 
 .maplibregl-ctrl-group button {
   background-color: transparent !important;
   border: none !important;
-  border-bottom: 1px solid #151d2c !important;
+  border-bottom: 1px solid var(--line) !important;
   width: 32px !important;
   height: 32px !important;
-  transition: all 0.15s ease-in-out;
+  transition: background-color var(--dur-micro) ease;
 }
 
 .maplibregl-ctrl-group button:last-child {
@@ -74,18 +138,14 @@ body {
 }
 
 .maplibregl-ctrl-group button:hover {
-  background-color: rgba(56, 189, 248, 0.15) !important;
-}
-
-.maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-  filter: invert(1) brightness(1.8) hue-rotate(180deg);
+  background-color: var(--surface-2) !important;
 }
 
 .maplibregl-ctrl-attrib {
-  background-color: rgba(8, 11, 17, 0.85) !important;
-  border: 1px solid #1f293d !important;
+  background-color: color-mix(in srgb, var(--paper) 90%, transparent) !important;
+  border: 1px solid var(--line) !important;
   border-radius: 4px !important;
-  color: #64748b !important;
+  color: var(--ink-3) !important;
   font-size: 10px !important;
   font-family: var(--font-geist-mono, monospace) !important;
   padding: 2px 6px !important;
@@ -93,20 +153,20 @@ body {
 }
 
 .maplibregl-ctrl-attrib a {
-  color: #94a3b8 !important;
+  color: var(--sky) !important;
   text-decoration: none !important;
 }
 
 .maplibregl-ctrl-attrib a:hover {
-  color: #38bdf8 !important;
+  color: var(--signal-ink) !important;
   text-decoration: underline !important;
 }
 
 .maplibregl-ctrl-scale {
-  background-color: rgba(15, 20, 31, 0.85) !important;
-  border: 1px solid #1f293d !important;
+  background-color: color-mix(in srgb, var(--paper) 85%, transparent) !important;
+  border: 1px solid var(--line-strong) !important;
   border-top: none !important;
-  color: #94a3b8 !important;
+  color: var(--ink-3) !important;
   font-size: 10px !important;
   font-family: var(--font-geist-mono, monospace) !important;
   padding: 2px 5px !important;
