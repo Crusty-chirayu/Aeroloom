@@ -328,3 +328,5 @@ export function getAircraftCategory(typeCode?: string | null): AircraftCategory 
 
   return 'unknown';
 }
+
+export const mapTypeCodeToCategory = getAircraftCategory;

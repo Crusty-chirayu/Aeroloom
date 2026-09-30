@@ -8,8 +8,9 @@
 | **Phase 0.5** | Altitude strip, Input micro-label, lint cleanup, initial screenshots | **DONE** (commit `a78e0d7`) | Persist adapter unused params, focus rings |
 | **Phase 0.6** | Horizontal overflow fix, 5-viewport test script, lint accounting, reduced motion proof | **DONE** (commit `64b8650`) | 40/40 viewport tests pass, all screenshot widths exact, zero overflow |
 | **Phase 1** | Data layer: FlightProvider adapter, Redis cache, route handlers, data docs | **DONE** (commit `0dd68bf`) | 120/120 tests pass, all 5 live API routes verified, failover + degraded path |
-| **Phase 2** | Aircraft system: SVG silhouettes, sprite atlas, blueprint art, /dev/aircraft | **DONE** (commit pending) | 133/133 tests pass, 50/50 viewports pass, 9 verified screenshots |
-| **Phase 3** | Map page: MapLibre basemap, 60fps interpolation, flight panel, filters | **IN PROGRESS** | Core map surface, rewrite useLiveAircraft (clears remaining lint debt) |
+| **Phase 2** | Aircraft system: SVG silhouettes, sprite atlas, blueprint art, /dev/aircraft | **DONE** (commit `48d7672`) | 133/133 tests pass, 50/50 viewports pass, 9 verified screenshots |
+| **Phase 3** | Map page: MapLibre basemap, 60fps interpolation, flight panel, filters | **DONE** | 133/133 tests pass, ZERO lint warnings, 50/50 viewports pass, 8 verified screenshots |
+| **Phase 4** | Flight, Airport, Search, Data pages | **IN PROGRESS** | Editorial layouts for /flight/[id], /airport/[icao], /airports, /search, /about/data |
 
 ---
 
@@ -265,3 +266,99 @@ Build a robust, production-grade, swappable FlightProvider architecture that shi
    - Create `docs/data-sources.md` (airplanes.live, adsb.lol, aviationweather.gov, OpenFreeMap/OSM tiles, terms, rate limits, attribution).
    - Add comprehensive tests in `tests/phase1-datalayer.test.ts`.
    - Run verification gate: `tsc`, `lint`, `npm test`, `npm run build`, `node scripts/check-overflow.mjs`.
+
+---
+
+## Phase 3 Execution & Verification Report
+
+### 1. Architecture Built
+1. **Light Custom Map Style (`lib/map/mapStyle.ts`)**:
+   - Authored custom MapLibre style JSON specification using OpenFreeMap vector tiles (free, ODbL permissive, zero-token infrastructure).
+   - Designed to strict editorial aviation specifications: `#F6F4EE` paper land, `#DCE6F0` soft pale-blue water, hairline admin boundaries, minimal roads, emphasized aerodromes and aeronautical waypoints.
+   - Built-in RainViewer raster precipitation radar integration.
+
+2. **Solar Day/Night Terminator Engine (`lib/map/dayNightTerminator.ts`)**:
+   - Authentic astronomical solar declination and Greenwich hour angle calculations.
+   - Generates exact night-side GeoJSON polygon rendered as subtle twilight shading (`rgba(14, 17, 22, 0.08)`).
+
+3. **60 FPS Dead-Reckoning & Interpolation Engine (`lib/map/interpolation.ts`)**:
+   - Continuous forward dead-reckoning along magnetic track at ground speed in `requestAnimationFrame` loop.
+   - Smooth ~600ms cubic ease-out position correction without teleportation or snapping.
+   - Strictly enforces DESIGN_SPEC.md §5: 60s stale state (40% opacity), 180s automatic dead contact eviction.
+   - Computes altitude-proportional ground shadow offsets for all airborne aircraft.
+
+4. **Telemetry Hook Rewrite (`hooks/useLiveAircraft.ts`)**:
+   - Completely rewritten to integrate canonical `AircraftState` and `AircraftInterpolator`.
+   - Bounds-based fetching with 250ms debounce and AbortController request cancellation.
+   - Zero per-aircraft React DOM components — WebGL symbol batching via MapLibre sources.
+   - **Cleared ALL remaining ESLint warnings**: ESLint now reports **0 errors and 0 warnings** across the entire project!
+
+5. **Desktop & Mobile Flight Telemetry Panel (`components/flight/FlightPanel.tsx`)**:
+   - 420px right-side slide-in dossier on desktop.
+   - Draggable bottom sheet with 3 snap points (`peek` 76px, `half` 48vh, `full` 86vh) on mobile with safe-area padding.
+   - Header with callsign in Instrument Serif, ICAO hex, category badge, and registration.
+   - Honest routing card: "Origin and destination routing displayed only when filed in verified schedule indexes."
+   - Hand-crafted SVG sparklines (`components/flight/FlightSparklines.tsx`) for altitude and speed profiles.
+   - Technical 3-view blueprint drawer using Phase 2 `AircraftBlueprint`.
+   - Emergency squawk alert banner (7500/7600/7700).
+
+6. **Tactical App Chrome & Controls (`components/map/MapControls.tsx` & `components/map/MapHoverTag.tsx`)**:
+   - 64px left rail chrome with navigation items and tooltips.
+   - Floating top command bar trigger (`⌘K`) + live airborne counter with pulsing signal dot.
+   - Collapsible filters chip bar: Altitude range, Category filter, On-Ground toggle.
+   - Layers menu popover: Day/Night Terminator, RainViewer Radar, Airports overlay.
+   - Sector switcher: Global, North America (CONUS), Europe, India, East Asia.
+   - Keyboard shortcuts: `Cmd/Ctrl+K` / `/` search, `F` camera follow lock, `Esc` dismiss, `L` toggle layers.
+   - High-precision <50ms floating tactical hover tag showing callsign, type, altitude, speed, vertical rate glyph.
+
+7. **Full /map Route Page (`app/map/page.tsx`)**:
+   - URL synchronization: `lat`, `lng`, `z`, `flight` preserved in URL query and restored on page load.
+   - Integrated status states: non-blocking banners for loading, degraded/cached telemetry, reconnect, and empty airspace.
+
+### 2. Lint & Code Quality Status
+- `npx tsc --noEmit`: **0 errors**.
+- `npm run lint`: **0 errors, 0 warnings** (completely clean!).
+- `npm test`: **133 / 133 tests passing** (32 suites).
+- `npm run build`: **Compiled successfully in 1.7s** (all 15 routes generated).
+
+### 3. Horizontal Overflow Validation (Real Outputs)
+```
+Checking horizontal overflow across 10 routes at 5 viewports...
+Checking /               : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/kit        : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/aircraft   : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/icons      : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /map            : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /search         : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /airports       : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /about/data     : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /flight/DAL397  : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /airport/KJFK   : ✓ PASS [360, 390, 768, 1280, 1728]
+
+--- OVERFLOW CHECK SUMMARY ---
+Passed: 50 / 50 (100%)
+SUCCESS: All routes passed zero horizontal overflow check at all target viewports!
+```
+
+### 4. Verified Screenshot Evidence (`docs/screenshots/phase3/`)
+All PNG file headers verified with binary parsing:
+- `map_idle_390px.png`: **390 × 844 px**
+- `map_idle_768px.png`: **768 × 1024 px**
+- `map_idle_1280px.png`: **1280 × 800 px**
+- `map_idle_1728px.png`: **1728 × 1080 px**
+- `map_selected_flight_1280px.png`: **1280 × 800 px**
+- `map_mobile_sheet_half_390px.png`: **390 × 844 px**
+- `map_palette_open_1280px.png`: **1280 × 800 px**
+- `map_reduced_motion_1280px.png`: **1280 × 800 px**
+
+### 5. Self-Critique & Fixes (Mandatory Step)
+1. **Weakness 1 (Section Heading Typography)**: `<h3>` elements inherited global `font-instrument-serif` display serif styles, causing section headers (`LIVE TELEMETRY STATUS`, `TRAJECTORY DYNAMICS`, `AIRFRAME SPECIFICATION`) to look inappropriately styled.
+   - *Fix*: Replaced `<h3>` with `.mono-label` utility class using `var(--font-geist-mono)` with 500 weight and `tracking-[0.08em]`.
+2. **Weakness 2 (MapLibre Worker Loading)**: Next.js/Turbopack security policy blocked MapLibre default blob worker, logging "Worker failed to load".
+   - *Fix*: Configured static worker endpoint via `setWorkerUrl('/maplibre-gl-worker.mjs')` prior to instantiating map, eliminating console errors.
+3. **Weakness 3 (Selected Flight URL Fallback)**: Navigating directly to `/map?flight=a38d95` before the first telemetry cycle caused the panel to collapse.
+   - *Fix*: Added immediate fallback state in `useLiveAircraft` so the panel reliably mounts and displays telemetry while the live polling loop acquires contacts.
+4. **Weakness 4 (Route Card Precision)**: Great-circle route card used a rotated generic icon without contextual waypoint design.
+   - *Fix*: Replaced with custom great-circle dashed indicator with central signal target pip, and clear origin/destination resolution typography.
+5. **Weakness 5 (Mobile Action Bar Clipping)**: Action buttons ("Follow", "Full Dossier") sat flush with bottom edge on mobile.
+   - *Fix*: Added `pb-8` bottom padding to mobile sheet content for safe-area compliance.

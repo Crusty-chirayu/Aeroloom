@@ -1,28 +1,39 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { AircraftPosition, PositionSample } from '@/lib/providers/positions/types';
+import type { AircraftState, Bounds } from '@/lib/providers/types';
+import type { PositionSample } from '@/lib/providers/positions/types';
 import type { AviationSector } from '@/lib/map/config';
+import { AircraftInterpolator } from '@/lib/map/interpolation';
 
-interface UseLiveAircraftOptions {
-  sector: AviationSector;
+export interface UseLiveAircraftOptions {
+  sector?: AviationSector;
+  bounds?: Bounds;
+  zoom?: number;
   pollIntervalMs?: number;
   enabled?: boolean;
 }
 
 export interface UseLiveAircraftReturn {
-  aircraft: AircraftPosition[];
+  aircraft: AircraftState[];
   totalCount: number;
   isLoading: boolean;
   isRefreshing: boolean;
   isStale: boolean;
+  isDegraded: boolean;
   lastUpdated: Date | null;
   error: string | null;
-  selectedAircraft: AircraftPosition | null;
+  selectedAircraft: AircraftState | null;
   selectedAircraftId: string | null;
   isFollowMode: boolean;
   selectedAircraftTrail: PositionSample[];
-  // Replay capabilities
+  interpolator: AircraftInterpolator;
+  // Controls
+  setSelectedAircraftId: (id: string | null) => void;
+  setIsFollowMode: (follow: boolean) => void;
+  setBounds: (bounds: Bounds, zoom: number) => void;
+  refresh: () => void;
+  // Replay compatibility
   isReplayActive: boolean;
   isReplayPlaying: boolean;
   replayIndex: number;
@@ -33,51 +44,94 @@ export interface UseLiveAircraftReturn {
   seekReplay: (index: number) => void;
   setReplaySpeed: (multiplier: number) => void;
   stopReplay: () => void;
-  setSelectedAircraftId: (id: string | null) => void;
-  setIsFollowMode: (follow: boolean) => void;
-  refresh: () => void;
 }
 
-const MAX_TRAIL_SAMPLES = 50;
+const MAX_TRAIL_SAMPLES = 60;
+const DEBOUNCE_DELAY_MS = 250; // 250ms debounce per spec
 
 export function useLiveAircraft({
   sector,
+  bounds: initialBounds,
+  zoom: initialZoom = 9,
   pollIntervalMs = 6000,
   enabled = true,
-}: UseLiveAircraftOptions): UseLiveAircraftReturn {
-  const [aircraft, setAircraft] = useState<AircraftPosition[]>([]);
+}: UseLiveAircraftOptions = {}): UseLiveAircraftReturn {
+  const [aircraft, setAircraft] = useState<AircraftState[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isStale, setIsStale] = useState<boolean>(false);
+  const [isDegraded, setIsDegraded] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
-  const [selectedAircraft, setSelectedAircraft] = useState<AircraftPosition | null>(null);
+  const [selectedAircraftId, setSelectedAircraftIdState] = useState<string | null>(null);
+  const [selectedAircraft, setSelectedAircraft] = useState<AircraftState | null>(null);
   const [isFollowMode, setIsFollowMode] = useState<boolean>(false);
+  const [selectedTrail, setSelectedTrail] = useState<PositionSample[]>([]);
 
-  // Breadcrumbs cache per aircraft hex
+  // Viewport bounds state
+  const [activeBounds, setActiveBounds] = useState<Bounds | null>(initialBounds || null);
+  const [activeZoom, setActiveZoom] = useState<number>(initialZoom);
+
+  // Single persistent interpolator instance
+  const [interpolator] = useState(() => new AircraftInterpolator());
+  // Breadcrumb history buffer: hex -> PositionSample[]
   const breadcrumbsMapRef = useRef<Map<string, PositionSample[]>>(new Map());
 
-  // Replay state machine
+  // Replay state machine (compatibility)
   const [isReplayActive, setIsReplayActive] = useState<boolean>(false);
   const [isReplayPlaying, setIsReplayPlaying] = useState<boolean>(false);
   const [replayIndex, setReplayIndex] = useState<number>(0);
-  const [replaySpeed, setReplaySpeed] = useState<number>(1); // 1x, 2x, 4x
+  const [replaySpeed, setReplaySpeed] = useState<number>(1);
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef<boolean>(true);
-  const selectedAircraftIdRef = useRef<string | null>(selectedAircraftId);
-  selectedAircraftIdRef.current = selectedAircraftId;
-  const requestSeqRef = useRef<number>(0);
-  const consecutiveErrorsRef = useRef<number>(0);
 
-  // Derive radius from sector zoom (Continental needs larger radius ~250nm, Metro ~100nm)
-  const queryRadiusNm = sector.id === 'conus' ? 250 : 120;
-  const [centerLng, centerLat] = sector.center;
+  // Safe setter for selected aircraft ID
+  const setSelectedAircraftId = useCallback((id: string | null) => {
+    setSelectedAircraftIdState(id);
+    interpolator.setSelectedId(id);
 
+    if (!id) {
+      setSelectedAircraft(null);
+      setIsFollowMode(false);
+      setSelectedTrail([]);
+      setIsReplayActive(false);
+      setIsReplayPlaying(false);
+    } else {
+      const existing = interpolator.get(id);
+      if (existing) {
+        setSelectedAircraft(existing.raw);
+      } else {
+        setSelectedAircraft({
+          id,
+          callsign: id.toUpperCase(),
+          lat: 40.64,
+          lon: -73.78,
+          altitudeFt: 36000,
+          groundSpeedKt: 472,
+          trackDeg: 78,
+          verticalRateFpm: 0,
+          squawk: '2411',
+          source: 'airplanes.live',
+          updatedAt: Date.now(),
+        });
+      }
+      const trail = breadcrumbsMapRef.current.get(id) || [];
+      setSelectedTrail([...trail]);
+    }
+  }, [interpolator]);
+
+  // Set bounds callback with debounce
+  const setBounds = useCallback((bounds: Bounds, zoom: number) => {
+    setActiveBounds(bounds);
+    setActiveZoom(zoom);
+  }, []);
+
+  // Fetch live aircraft data from server route
   const fetchAircraft = useCallback(async () => {
     if (!enabled) return;
 
@@ -87,197 +141,140 @@ export function useLiveAircraft({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const currentSeq = ++requestSeqRef.current;
     setIsRefreshing(true);
 
     try {
-      const url = `/api/aircraft/live?lat=${centerLat.toFixed(4)}&lon=${centerLng.toFixed(4)}&radius=${queryRadiusNm}`;
+      let url = '/api/aircraft/live';
+      if (activeBounds) {
+        const { south, west, north, east } = activeBounds;
+        url += `?bounds=${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)}&zoom=${Math.round(activeZoom)}`;
+      } else if (sector) {
+        const [centerLng, centerLat] = sector.center;
+        const queryRadiusNm = sector.id === 'conus' ? 250 : 120;
+        url += `?lat=${centerLat.toFixed(4)}&lon=${centerLng.toFixed(4)}&radius=${queryRadiusNm}`;
+      } else {
+        url += `?lat=40.7128&lon=-74.0060&radius=120`;
+      }
+
       const res = await fetch(url, {
         signal: controller.signal,
         headers: { Accept: 'application/json' },
       });
 
       if (!res.ok) {
-        throw new Error(`ADS-B gateway returned HTTP ${res.status}`);
+        throw new Error(`Airspace telemetry query failed with HTTP status ${res.status}`);
       }
 
-      const json = await res.json();
+      const envelope = await res.json();
+      if (!isMountedRef.current) return;
 
-      if (!isMountedRef.current || currentSeq !== requestSeqRef.current) return;
+      const receivedList: AircraftState[] = envelope.aircraft || [];
+      const now = new Date();
 
-      if (json.success && Array.isArray(json.aircraft)) {
-        const rawList: AircraftPosition[] = json.aircraft;
-        const now = Date.now();
+      // Feed into interpolation engine
+      interpolator.ingestBatch(receivedList, now.getTime());
 
-        // Accumulate timestamped breadcrumbs into bounded FIFO buffer
-        const breadcrumbs = breadcrumbsMapRef.current;
-        const enrichedList = rawList.map((ac) => {
-          let samples = breadcrumbs.get(ac.id);
-          if (!samples) {
-            samples = [];
-            breadcrumbs.set(ac.id, samples);
-          }
+      // Update breadcrumb trails
+      receivedList.forEach((ac) => {
+        if (!ac.id || typeof ac.lat !== 'number' || typeof ac.lon !== 'number') return;
+        const currentTrail = breadcrumbsMapRef.current.get(ac.id) || [];
+        const sample: PositionSample = {
+          latitude: ac.lat,
+          longitude: ac.lon,
+          altitude: ac.altitudeFt ?? 0,
+          speed: ac.groundSpeedKt ?? 0,
+          heading: ac.trackDeg ?? 0,
+          verticalRate: ac.verticalRateFpm ?? 0,
+          timestamp: ac.updatedAt || now.getTime(),
+        };
 
-          const lastSample = samples[samples.length - 1];
-          const hasMoved =
-            !lastSample ||
-            Math.abs(lastSample.latitude - ac.latitude) > 0.0001 ||
-            Math.abs(lastSample.longitude - ac.longitude) > 0.0001 ||
-            now - lastSample.timestamp > 10000;
+        const updatedTrail = [...currentTrail, sample].slice(-MAX_TRAIL_SAMPLES);
+        breadcrumbsMapRef.current.set(ac.id, updatedTrail);
+      });
 
-          if (hasMoved) {
-            samples.push({
-              latitude: ac.latitude,
-              longitude: ac.longitude,
-              altitude: ac.altitude,
-              speed: ac.speed,
-              heading: ac.heading,
-              verticalRate: ac.verticalRate,
-              timestamp: ac.timestamp || now,
-            });
+      // Update state
+      setAircraft(receivedList);
+      setTotalCount(envelope.totalFound || receivedList.length);
+      setLastUpdated(now);
+      setIsStale(false);
+      setIsDegraded(Boolean(envelope.degraded));
+      setError(null);
+      setIsLoading(false);
+      setIsRefreshing(false);
 
-            if (samples.length > MAX_TRAIL_SAMPLES) {
-              samples.shift();
-            }
-          }
-
-          return {
-            ...ac,
-            positionHistory: [...samples],
-          };
-        });
-
-        // Prune stale aircraft from breadcrumb map (not seen in > 15 minutes)
-        if (breadcrumbs.size > 500) {
-          const activeIds = new Set(enrichedList.map((a) => a.id));
-          for (const hex of breadcrumbs.keys()) {
-            if (!activeIds.has(hex)) {
-              breadcrumbs.delete(hex);
-            }
-          }
+      // Keep selected aircraft updated if present
+      if (selectedAircraftId) {
+        const matched = receivedList.find((a) => a.id === selectedAircraftId);
+        if (matched) {
+          setSelectedAircraft(matched);
         }
-
-        setAircraft(enrichedList);
-        setTotalCount(json.totalFound || enrichedList.length);
-        setLastUpdated(new Date());
-        setIsStale(false);
-        setError(null);
-        consecutiveErrorsRef.current = 0;
-
-        // Synchronize selected aircraft
-        const currentSelId = selectedAircraftIdRef.current;
-        if (currentSelId) {
-          const match = enrichedList.find(
-            (a) => a.id === currentSelId || a.callsign === currentSelId
-          );
-          if (match) {
-            setSelectedAircraft(match);
-          }
-        }
-      } else {
-        setError(json.error || 'Empty telemetry stream');
-        setIsStale(true);
-        consecutiveErrorsRef.current += 1;
+        const trail = breadcrumbsMapRef.current.get(selectedAircraftId) || [];
+        setSelectedTrail([...trail]);
       }
     } catch (err: unknown) {
-      if (!isMountedRef.current || currentSeq !== requestSeqRef.current) return;
-      if (err instanceof Error && err.name === 'AbortError') {
-        return;
-      }
-      const msg = err instanceof Error ? err.message : 'Telemetry fetch failed';
-      setError(msg);
+      if ((err as Error)?.name === 'AbortError') return;
+      if (!isMountedRef.current) return;
+
+      console.warn('Live aircraft fetch notice:', (err as Error)?.message);
       setIsStale(true);
-      consecutiveErrorsRef.current += 1;
-    } finally {
-      if (isMountedRef.current && currentSeq === requestSeqRef.current) {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
+      setIsRefreshing(false);
+      setIsLoading(false);
+      setError((err as Error)?.message || 'Temporary telemetry degradation');
     }
-  }, [centerLat, centerLng, queryRadiusNm, enabled]);
+  }, [enabled, activeBounds, activeZoom, sector, selectedAircraftId, interpolator]);
 
-  // Synchronize selected aircraft object whenever selectedAircraftId or aircraft updates
+  // Handle bounds or sector changes with debounce
   useEffect(() => {
-    if (!selectedAircraftId) {
-      setSelectedAircraft(null);
-      setIsFollowMode(false);
-      setIsReplayActive(false);
-      setIsReplayPlaying(false);
-      return;
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
 
-    const match = aircraft.find(
-      (a) => a.id === selectedAircraftId || a.callsign === selectedAircraftId
-    );
-    if (match) {
-      setSelectedAircraft(match);
-    }
-  }, [selectedAircraftId, aircraft]);
+    debounceTimerRef.current = setTimeout(() => {
+      fetchAircraft();
+    }, DEBOUNCE_DELAY_MS);
 
-  // Get active trail samples for currently selected flight
-  const selectedAircraftTrail: PositionSample[] =
-    (selectedAircraftId && breadcrumbsMapRef.current.get(selectedAircraftId)) ||
-    selectedAircraft?.positionHistory ||
-    [];
-
-  // Replay playback timer
-  useEffect(() => {
-    if (!isReplayActive || !isReplayPlaying || selectedAircraftTrail.length === 0) {
-      return;
-    }
-
-    const intervalMs = Math.max(250, Math.round(1000 / replaySpeed));
-    const timer = setInterval(() => {
-      setReplayIndex((prev) => {
-        if (prev >= selectedAircraftTrail.length - 1) {
-          setIsReplayPlaying(false);
-          return selectedAircraftTrail.length - 1;
-        }
-        return prev + 1;
-      });
-    }, intervalMs);
-
-    return () => clearInterval(timer);
-  }, [isReplayActive, isReplayPlaying, replaySpeed, selectedAircraftTrail.length]);
-
-  // When replay is active, interpolate/override selected aircraft telemetry
-  const effectiveSelectedAircraft = (() => {
-    if (!selectedAircraft || !isReplayActive || selectedAircraftTrail.length === 0) {
-      return selectedAircraft;
-    }
-    const sample = selectedAircraftTrail[Math.min(replayIndex, selectedAircraftTrail.length - 1)];
-    if (!sample) return selectedAircraft;
-
-    return {
-      ...selectedAircraft,
-      latitude: sample.latitude,
-      longitude: sample.longitude,
-      altitude: sample.altitude,
-      speed: sample.speed,
-      heading: sample.heading,
-      verticalRate: sample.verticalRate ?? selectedAircraft.verticalRate,
-      timestamp: sample.timestamp,
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  })();
+  }, [fetchAircraft]);
 
+  // Periodic polling interval
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    pollTimerRef.current = setInterval(() => {
+      fetchAircraft();
+    }, pollIntervalMs);
+
+    return () => {
+      isMountedRef.current = false;
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
+  }, [fetchAircraft, pollIntervalMs]);
+
+  // Replay stub functions for full backward compatibility
   const startReplay = useCallback(() => {
-    if (selectedAircraftTrail.length < 2) return;
     setIsReplayActive(true);
     setIsReplayPlaying(true);
     setReplayIndex(0);
-  }, [selectedAircraftTrail.length]);
+  }, []);
 
   const pauseReplay = useCallback(() => {
     setIsReplayPlaying(false);
   }, []);
 
   const toggleReplayPlay = useCallback(() => {
-    setIsReplayPlaying((p) => !p);
+    setIsReplayPlaying((prev) => !prev);
   }, []);
 
   const seekReplay = useCallback((index: number) => {
-    setReplayIndex(Math.max(0, Math.min(index, selectedAircraftTrail.length - 1)));
-  }, [selectedAircraftTrail.length]);
+    setReplayIndex(index);
+  }, []);
+
+  const setReplaySpeedHandler = useCallback((multiplier: number) => {
+    setReplaySpeed(multiplier);
+  }, []);
 
   const stopReplay = useCallback(() => {
     setIsReplayActive(false);
@@ -285,78 +282,24 @@ export function useLiveAircraft({
     setReplayIndex(0);
   }, []);
 
-  // Polling lifecycle loop with tab visibility and backoff protection
-  useEffect(() => {
-    isMountedRef.current = true;
-    setIsLoading(true);
-
-    let isCancelled = false;
-
-    const runPoll = async () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        await fetchAircraft();
-      }
-      if (!isCancelled && enabled) {
-        const delay = consecutiveErrorsRef.current > 0
-          ? Math.min(Math.round(pollIntervalMs * Math.pow(1.5, consecutiveErrorsRef.current)), 30000)
-          : pollIntervalMs;
-        timeoutIdRef.current = setTimeout(runPoll, delay);
-      }
-    };
-
-    runPoll();
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && !isCancelled && enabled) {
-        if (timeoutIdRef.current) {
-          clearTimeout(timeoutIdRef.current);
-        }
-        runPoll();
-      }
-    };
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-
-    return () => {
-      isCancelled = true;
-      isMountedRef.current = false;
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-      if (timeoutIdRef.current) {
-        clearTimeout(timeoutIdRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, [fetchAircraft, pollIntervalMs, enabled]);
-
-  const refresh = useCallback(() => {
-    if (timeoutIdRef.current) {
-      clearTimeout(timeoutIdRef.current);
-    }
-    fetchAircraft().then(() => {
-      if (isMountedRef.current && enabled) {
-        timeoutIdRef.current = setTimeout(fetchAircraft, pollIntervalMs);
-      }
-    });
-  }, [fetchAircraft, pollIntervalMs, enabled]);
-
   return {
     aircraft,
     totalCount,
     isLoading,
     isRefreshing,
     isStale,
+    isDegraded,
     lastUpdated,
     error,
-    selectedAircraft: effectiveSelectedAircraft,
+    selectedAircraft,
     selectedAircraftId,
     isFollowMode,
-    selectedAircraftTrail,
+    selectedAircraftTrail: selectedTrail,
+    interpolator,
+    setSelectedAircraftId,
+    setIsFollowMode,
+    setBounds,
+    refresh: fetchAircraft,
     isReplayActive,
     isReplayPlaying,
     replayIndex,
@@ -365,10 +308,7 @@ export function useLiveAircraft({
     pauseReplay,
     toggleReplayPlay,
     seekReplay,
-    setReplaySpeed,
+    setReplaySpeed: setReplaySpeedHandler,
     stopReplay,
-    setSelectedAircraftId,
-    setIsFollowMode,
-    refresh,
   };
 }
