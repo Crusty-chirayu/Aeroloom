@@ -18,14 +18,14 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
 
   return (
     <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between p-6 md:p-12 max-w-[1360px] mx-auto">
-      <header className="flex items-center justify-between border-b border-[var(--line)] pb-4">
-        <Link href="/">
+      <header className="flex items-center justify-between gap-2 border-b border-[var(--line)] pb-4">
+        <Link href="/" className="shrink-0">
           <Button variant="ghost" size="sm" icon="arrow-left">
             Home
           </Button>
         </Link>
-        <span className="mono-label text-[11px] text-[var(--ink-3)]">
-          FLIGHT DOSSIER STUB · PHASE 4 FULL BUILD
+        <span className="mono-label text-[11px] text-[var(--ink-3)] truncate text-right">
+          FLIGHT DOSSIER · PHASE 4
         </span>
       </header>
 
@@ -49,7 +49,7 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
           </div>
         </Panel>
 
-        <div className="pt-4 flex items-center gap-3">
+        <div className="pt-4 flex flex-wrap items-center gap-3">
           <Link href="/dev/kit">
             <Button variant="outline" size="md" icon="arrow-right" iconPosition="right">
               Inspect Component Kit (/dev/kit)

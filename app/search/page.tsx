@@ -2,11 +2,13 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 
 export default function SearchPage() {
+  const router = useRouter();
   const [open, setOpen] = useState(true);
 
   return (
@@ -46,10 +48,10 @@ export default function SearchPage() {
           open={open}
           onOpenChange={setOpen}
           onSelectFlight={(callsign) => {
-            window.location.href = `/flight/${callsign.toLowerCase()}`;
+            router.push(`/flight/${callsign.toLowerCase()}`);
           }}
           onSelectAirport={(icao) => {
-            window.location.href = `/airport/${icao.toLowerCase()}`;
+            router.push(`/airport/${icao.toLowerCase()}`);
           }}
         />
       </main>

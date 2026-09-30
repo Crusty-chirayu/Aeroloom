@@ -30,31 +30,31 @@ export default function DevKitPage() {
     <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] pb-32">
       {/* Sticky Header */}
       <header className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--paper)]/95 backdrop-blur-md px-6 py-4">
-        <div className="max-w-[1360px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="font-serif text-2xl tracking-tight text-[var(--ink)]">
+        <div className="max-w-[1360px] mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <Link href="/" className="font-serif text-2xl tracking-tight text-[var(--ink)] shrink-0">
               Aeroloom
             </Link>
-            <span className="text-[var(--ink-4)]">/</span>
-            <span className="mono-label text-[11px] text-[var(--ink-2)]">Design System Kit</span>
-            <Chip variant="signal">Phase 0 Baseline</Chip>
+            <span className="text-[var(--ink-4)] hidden sm:inline">/</span>
+            <span className="mono-label text-[11px] text-[var(--ink-2)] hidden md:inline truncate">Design System Kit</span>
+            <span className="hidden lg:inline shrink-0"><Chip variant="signal">Phase 0 Baseline</Chip></span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               variant="outline"
               size="sm"
               icon="search"
               onClick={() => setIsCommandOpen(true)}
             >
-              <span>Command Palette</span>
-              <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.2 font-mono text-[10px] bg-[var(--paper-2)] rounded border border-[var(--line)]">
+              <span className="hidden sm:inline">Command Palette</span>
+              <kbd className="ml-1 px-1.5 py-0.2 font-mono text-[10px] bg-[var(--paper-2)] rounded border border-[var(--line)]">
                 ⌘K
               </kbd>
             </Button>
             <Link href="/">
               <Button variant="ghost" size="sm" icon="arrow-left">
-                Home
+                <span className="hidden sm:inline">Home</span>
               </Button>
             </Link>
           </div>
@@ -197,7 +197,7 @@ export default function DevKitPage() {
               ].map((col, i, arr) => (
                 <div
                   key={col.name}
-                  className="flex-1 flex flex-col justify-end px-1.5 py-1.5 group relative"
+                  className="min-w-0 flex-1 flex flex-col justify-end px-1 sm:px-1.5 py-1.5 group relative"
                   style={{ backgroundColor: `var(${col.name})` }}
                   title={`${col.name}: ${col.hex}`}
                 >
@@ -206,13 +206,13 @@ export default function DevKitPage() {
                     <div className="absolute right-0 top-0 bottom-0 w-px bg-black/10" />
                   )}
                   <div
-                    className="font-mono text-[9px] font-semibold leading-none truncate"
+                    className="font-mono text-[8px] sm:text-[9px] font-semibold leading-none truncate"
                     style={{ color: col.dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.45)' }}
                   >
                     {col.label}
                   </div>
                   <div
-                    className="font-mono text-[8px] leading-none truncate mt-0.5"
+                    className="font-mono text-[7px] sm:text-[8px] leading-none truncate mt-0.5"
                     style={{ color: col.dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)' }}
                   >
                     {col.hex}
@@ -236,14 +236,14 @@ export default function DevKitPage() {
               ].map((col, i, arr) => (
                 <div
                   key={col.name}
-                  className="flex-1 flex flex-col justify-end px-1.5 py-1.5 relative"
+                  className="min-w-0 flex-1 flex flex-col justify-end px-1 sm:px-1.5 py-1.5 relative"
                   style={{ backgroundColor: `var(${col.name})` }}
                   title={`${col.name}: ${col.hex}`}
                 >
                   {i < arr.length - 1 && (
                     <div className="absolute right-0 top-0 bottom-0 w-px bg-black/20" />
                   )}
-                  <div className="font-mono text-[9px] font-semibold leading-none truncate text-white/80">
+                  <div className="font-mono text-[8px] sm:text-[9px] font-semibold leading-none truncate text-white/80">
                     {col.label}
                   </div>
                 </div>
@@ -265,17 +265,17 @@ export default function DevKitPage() {
               ].map((alt, i, arr) => (
                 <div
                   key={alt.name}
-                  className="flex-1 flex flex-col justify-end px-1.5 py-1.5 relative"
+                  className="min-w-0 flex-1 flex flex-col justify-end px-1 sm:px-1.5 py-1.5 relative"
                   style={{ backgroundColor: `var(${alt.name})` }}
                   title={alt.name}
                 >
                   {i < arr.length - 1 && (
                     <div className="absolute right-0 top-0 bottom-0 w-px bg-black/20" />
                   )}
-                  <div className="font-mono text-[9px] font-bold leading-none truncate text-white">
+                  <div className="font-mono text-[8px] sm:text-[9px] font-bold leading-none truncate text-white">
                     {alt.name}
                   </div>
-                  <div className="font-mono text-[8px] leading-none truncate mt-0.5 text-white/70">
+                  <div className="font-mono text-[7px] sm:text-[8px] leading-none truncate mt-0.5 text-white/70">
                     {alt.label}
                   </div>
                 </div>

@@ -14,8 +14,12 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "public/**",
     "scripts/**",
+    "docs/**",
   ]),
   {
+    plugins: {
+      "react-hooks": nextVitals[0].plugins["react-hooks"],
+    },
     rules: {
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/refs": "warn",
