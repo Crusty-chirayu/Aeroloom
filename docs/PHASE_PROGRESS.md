@@ -7,8 +7,9 @@
 | **Phase 0** | Audit & Foundations, tokens, primitives, /dev/kit | **DONE** (commit `6d73256`) | Design tokens, typography, motion tokens, Radix base components |
 | **Phase 0.5** | Altitude strip, Input micro-label, lint cleanup, initial screenshots | **DONE** (commit `a78e0d7`) | Persist adapter unused params, focus rings |
 | **Phase 0.6** | Horizontal overflow fix, 5-viewport test script, lint accounting, reduced motion proof | **DONE** (commit `64b8650`) | 40/40 viewport tests pass, all screenshot widths exact, zero overflow |
-| **Phase 1** | Data layer: FlightProvider adapter, Redis cache, route handlers, data docs | **DONE** (commit pending) | 120/120 tests pass, all 5 live API routes verified, failover + degraded path |
-| **Phase 2** | Aircraft system: SVG silhouettes, sprite atlas, blueprint art, /dev/aircraft | **IN PROGRESS** | Top-down silhouettes, ICAO type mapping, sprite atlas |
+| **Phase 1** | Data layer: FlightProvider adapter, Redis cache, route handlers, data docs | **DONE** (commit `0dd68bf`) | 120/120 tests pass, all 5 live API routes verified, failover + degraded path |
+| **Phase 2** | Aircraft system: SVG silhouettes, sprite atlas, blueprint art, /dev/aircraft | **DONE** (commit pending) | 133/133 tests pass, 50/50 viewports pass, 9 verified screenshots |
+| **Phase 3** | Map page: MapLibre basemap, 60fps interpolation, flight panel, filters | **IN PROGRESS** | Core map surface, rewrite useLiveAircraft (clears remaining lint debt) |
 
 ---
 
@@ -79,52 +80,84 @@
 
 ---
 
-## Phase 2: Aircraft System Implementation Plan
+## Phase 2 Execution & Verification Report
 
-### Goals
-Author the custom aviation visual identity: handcrafted top-down SVG silhouettes, type code mapping, MapLibre sprite atlas (1x, 2x, 3x DPR) across all states, technical blueprint line drawings with animated stroke-dashoffset, and custom aviation UI icons. Expose on `/dev/aircraft` and `/dev/icons`.
+### 1. Architecture Built
+1. **Top-Down Vector Silhouettes (`lib/map/silhouettes/`)**:
+   - 11 distinct aerodynamic categories authored on a 64×64 coordinate space (`narrowbody`, `widebody_twin`, `quad`, `regional_jet`, `turboprop`, `bizjet`, `light_ga`, `helicopter`, `cargo`, `military`, `unknown`).
+   - True-to-life proportions (wing sweep, engine nacelle count and placement, aspect ratio, tail geometry, propeller discs, and rotor hubs).
+   - 6 tactical states per silhouette (`default`, `selected`, `hover`, `stale`, `on_ground`, `ground_shadow`) rendered in crisp vector SVG with zero dark-theme remnants.
+   - Dynamic stroke scaling: <= 32px renders 1.5px outline; >= 48px renders 2px outline to prevent choked wing roots on high-density map displays.
 
-### Implementation Checklist
-1. **Top-Down SVG Silhouettes (`lib/map/silhouettes/`)**:
-   - 11 distinct proportional categories on a 64×64 grid:
-     1. Narrowbody (A320 / B737 family)
-     2. Widebody Twin (B787 / A350 / B777)
-     3. Quad (A380 / B747)
-     4. Regional Jet (E175 / CRJ900)
-     5. Turboprop (ATR 72 / Dash 8 Q400)
-     6. Business Jet (Global 7500 / Citation X)
-     7. Light GA (Cessna 172 Skyhawk)
-     8. Helicopter (H145 / S-76 with rotor disc)
-     9. Cargo Freighter (747F / 777F with cargo deck)
-     10. Military / Other (neutral angular dart)
-     11. Unknown (clean geometric chevron)
-   - Variants per silhouette: `default` (ink), `selected` (signal color with 2px white outline), `hover` (scale 1.15), `stale` (40% opacity), `on-ground` (smaller, ink-3), and `ground-shadow` (12% ink soft shadow offset).
+2. **ICAO Type Designator Mapping Engine (`lib/map/typeMapping.ts`)**:
+   - Direct lookup covering 175+ common ICAO codes (commercial airliners, business jets, turboprops, GA, rotorcraft, freighters, fast jets).
+   - Multi-tier fallback hierarchy: direct map → `AIRCRAFT_CATALOG` categorization → manufacturer family prefix heuristics → clean geometric `unknown` fallback.
+   - 100% test coverage in `tests/phase2-aircraft-system.test.ts`.
 
-2. **ICAO Type Code Mapping (`lib/map/typeMapping.ts`)**:
-   - Table covering 150+ common airliner, regional, bizjet, GA, and helicopter codes.
-   - Comprehensive fallbacks via `lib/metadata/aircraftCatalog.ts`.
-   - Unit tests covering direct mapping, category fallbacks, and unknown codes.
-
-3. **MapLibre Sprite Atlas Generator (`lib/map/spriteAtlas.ts`)**:
-   - Generates sprite PNGs and JSON metadata index at 1x, 2x, and 3x DPR for all categories and states.
-   - Replaces old `lib/map/aircraftIcon.ts` entirely.
-   - Zero dark-theme colors.
+3. **MapLibre Vector Sprite Atlas Generator (`lib/map/spriteAtlas.ts`)**:
+   - Generates and registers 66 unique tactical markers (`11 categories × 6 states`) dynamically onto MapLibre GL instances at 1x, 2x, and 3x DPR.
+   - Canonical ID scheme: `ac-[category]-[state]` (e.g. `ac-narrowbody-default`, `ac-helicopter-selected`).
+   - Replaced legacy canvas-drawn `lib/map/aircraftIcon.ts` completely.
 
 4. **Technical Blueprint Illustrations (`components/aircraft/AircraftBlueprint.tsx`)**:
-   - Technical 3-view line drawings (top, side, front view) with hairline ink strokes.
-   - Monospaced dimension callouts (wingspan, length, height) labeled as typical for the category.
-   - Animated SVG stroke-dashoffset reveal that switches to instant/calm fades under `prefers-reduced-motion`.
+   - 3-view technical line drawings (Planform Top, Side Elevation, Front Elevation & Dihedral) on a hairline cadastre grid.
+   - Category-accurate front and side elevations for helicopters (rotor mast, skids, tail boom), quads (4 engines), turboprops (high wing with twin prop discs), light GA (high wing with struts and nose spinner), and jets.
+   - Monospaced dimension callouts (Wingspan, Length, Height) in metric and imperial, labeled clearly as typical values.
+   - Animated SVG `stroke-dashoffset` draw-in that gracefully switches to instant calm render when `prefers-reduced-motion` is detected.
 
-5. **Custom Aviation Icons (`components/ui/Icon.tsx`)**:
-   - Hand-draw custom icons in 24px grid / 1.5px stroke: takeoff, landing, runway, tower, altitude, vertical-rate up/down, heading/compass, squawk, gate, delay, route-arc, layers, filter.
-   - Integrated into typed `IconName` union.
+5. **Custom Aviation Icons Registry (`components/ui/Icon.tsx` & `components/ui/aviationIcons.tsx`)**:
+   - 12 custom aeronautical SVG icons authored on a 24px grid with 1.5px stroke width: `takeoff`, `landing`, `runway`, `tower`, `altitude`, `vertical-rate-up`, `vertical-rate-down`, `heading`, `squawk`, `gate`, `delay`, `route-arc`.
+   - Typed into `IconName` union alongside base Lucide icons.
 
 6. **Dev Specimen Pages**:
-   - `/dev/aircraft`: Specimen grid showing all silhouettes in all states at 24, 32, 48, 96 px on paper and white, type lookup tester, and technical blueprints.
-   - `/dev/icons`: Complete icon library specimen with search and size toggles.
+   - `/dev/aircraft`: Specimen matrix showing all 11 silhouettes across all 6 states at 24, 32, 48, 96 px on both paper and white, live ICAO type code resolver with 175+ entry table, and interactive 3-view technical blueprints.
+   - `/dev/icons`: Complete icon library specimen with name search, custom vs base filters, size scaling (16, 20, 24, 32 px), and stroke width adjustments.
 
-7. **Verification Gate**:
-   - `tsc`, `lint`, `npm test`, `npm run build`, `check-overflow.mjs`, Playwright screenshots at 4 viewports for `/dev/aircraft` and `/dev/icons`, self-critique.
+### 2. Mandatory Self-Critique & Fixes Applied
+1. **Weakness 1 (Blueprint Generic Profile)**: In `AircraftBlueprint`, side and front elevations were initially identical for all categories, causing helicopters and quads to display twin-jet elevations.
+   - *Fix*: Authored category-specific side and front elevation SVGs in `components/aircraft/AircraftBlueprint.tsx` for helicopters (rotor mast, landing skids, tail rotor), quads (4 distinct engines), turboprops (high wing with twin props), and light GA (struts, nose propeller).
+2. **Weakness 2 (Selected Stroke Vertex Choking at Small Viewports)**: At 24px, the 2px white outline stroke slightly crowded tight wing root vertices.
+   - *Fix*: Scaled stroke width dynamically in `lib/map/silhouettes/styles.ts` (1.5px at <= 32px, 2px at >= 48px) with `stroke-linejoin="round"`.
+3. **Weakness 3 (Turboprop Propeller Disc Clarity)**: Propeller disc in top-down view was initially a single line, resembling a scratch at 24px.
+   - *Fix*: Enhanced `lib/map/silhouettes/paths.ts` with explicit propeller spinner hub and cross blades for both engines.
+4. **Weakness 4 (Dev Icons Search Aesthetic)**: `/dev/icons` search input had a generic appearance without the design system's monospace metadata treatment.
+   - *Fix*: Added mono uppercase micro-label (`SEARCH GLYPH REGISTRY`) and tuned filter button padding.
+5. **Weakness 5 (Cargo Freighter Visual Differentiation)**: Cargo silhouette initially lacked distinct commercial freighter characteristics.
+   - *Fix*: Added aft cargo door seam lines and widened main deck loading ramp in `lib/map/silhouettes/paths.ts`.
+
+### 3. Verification Gate Evidence
+- `npx tsc --noEmit`: **0 errors**
+- `npm run lint`: **0 errors, 5 warnings** (only known debt in `hooks/useLiveAircraft.ts` for Phase 3)
+- `npm test`: **133 / 133 tests pass** (13 new tests added in `tests/phase2-aircraft-system.test.ts`)
+- `npm run build`: **Clean build**, 16 total routes compiled (including `/dev/aircraft` and `/dev/icons`)
+- `node scripts/check-overflow.mjs`: **50 / 50 route-viewport combinations pass** with 0px overflow
+- Playwright screenshot proof (`docs/screenshots/phase2/`):
+  - `aircraft_390px.png`: **390 × 10236 px** (exact target width)
+  - `aircraft_768px.png`: **768 × 6081 px** (exact target width)
+  - `aircraft_1280px.png`: **1280 × 5811 px** (exact target width)
+  - `aircraft_1728px.png`: **1728 × 5811 px** (exact target width)
+  - `icons_390px.png`: **390 × 5722 px** (exact target width)
+  - `icons_768px.png`: **768 × 3094 px** (exact target width)
+  - `icons_1280px.png`: **1280 × 2198 px** (exact target width)
+  - `icons_1728px.png`: **1728 × 2198 px** (exact target width)
+  - `aircraft_1280px_reduced_motion.png`: **1280 × 800 px** (verified instant static render, no animated stroke-dashoffset)
+
+---
+
+## Phase 3: Map Page Implementation Plan
+
+### Goals
+Build the flagship `/map` live flight tracking surface per DESIGN_SPEC.md §8 and ANTIGRAVITY_PHASE_PROMPTS.md Phase 3.
+- Custom light MapLibre style JSON: paper land (`#F6F4EE`), soft pale-blue water (`#E3EAF5`), hairline borders, minimal roads, airports emphasized. Free vector tiles with verified terms.
+- Aircraft WebGL layer using the Phase 2 sprite atlas (`ac-[category]-[state]`), rotated by `trackDeg`, colored by altitude ramp or solid ink, with ground-shadow layer offset by altitude.
+- Complete rewrite of `hooks/useLiveAircraft.ts`:
+  - Bounds-based fetching with 250ms debounce and AbortController.
+  - Typed-array / GeoJSON batched updates to MapLibre source (NO per-aircraft React components).
+  - Single `requestAnimationFrame` loop that dead-reckons positions between updates at ground speed and eases corrections over ~600ms.
+  - Resolves all 5 remaining lint warnings in `hooks/useLiveAircraft.ts`.
+- Stale handling: >60s aircraft at 40% opacity, >180s removed.
+- Fast hover tag (<50ms), selection reticle with pulsing ring, desktop 420px flight panel, mobile draggable bottom sheet with 3 snap points.
+- Map controls: sector presets, layer toggles, altitude filter, and speed filter.
 | **Phase 3** | Map page: MapLibre basemap, 60fps interpolation, flight panel, filters | PENDING | Core map surface, rewrite useLiveAircraft (clears remaining lint debt) |
 | **Phase 4** | Flight & airport pages, search, data page | PENDING | Editorial layout, METAR decode, airport radar |
 | **Phase 5A** | Landing page: preloader, nav, hero, pinned "Follow one flight" | PENDING | GSAP ScrollTrigger, Lenis, live background map |

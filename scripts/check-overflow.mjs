@@ -5,6 +5,8 @@ const VIEWPORT_WIDTHS = [360, 390, 768, 1280, 1728];
 const ROUTES = [
   '/',
   '/dev/kit',
+  '/dev/aircraft',
+  '/dev/icons',
   '/map',
   '/search',
   '/airports',

@@ -4,12 +4,13 @@
  * ARCHITECTURE:
  * - All icons go through this registry. No ad-hoc Lucide imports in components.
  * - Initial set uses Lucide icons with a precise 1.5px stroke width on a 24px grid.
- * - Phase 2: Custom aviation SVG icons will be implemented in CUSTOM_ICONS below.
- *   The IconName type union auto-expands so components need no refactoring.
+ * - Phase 2: Custom aviation SVG icons authored in components/ui/aviationIcons.tsx
+ *   in the same 24px / 1.5px-stroke visual style.
  *
  * USAGE:
  *   import { Icon } from '@/components/ui/Icon';
  *   <Icon name="plane" size={16} className="text-[var(--signal)]" />
+ *   <Icon name="takeoff" size={20} />
  */
 
 import React from 'react';
@@ -30,6 +31,21 @@ import {
   Moon, Sun, Wind, Zap, Flag,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+
+import {
+  TakeoffIcon,
+  LandingIcon,
+  RunwayIcon,
+  TowerIcon,
+  AltitudeIcon,
+  VerticalRateUpIcon,
+  VerticalRateDownIcon,
+  HeadingIcon,
+  SquawkIcon,
+  GateIcon,
+  DelayIcon,
+  RouteArcIcon,
+} from './aviationIcons';
 
 // ─── Lucide Icons Initial Registry ────────────────────────────────────────────
 export const LUCIDE_ICONS = {
@@ -82,22 +98,20 @@ export const LUCIDE_ICONS = {
   flag: Flag,
 } as const satisfies Record<string, LucideIcon>;
 
-// ─── Custom Aviation Icons (Phase 2 TODO Slots) ──────────────────────────────
-// In Phase 2, custom hand-drawn SVG icons will be provided for these slots.
-// Signature: (props: React.SVGProps<SVGSVGElement>) => React.JSX.Element
+// ─── Custom Aviation Icons Registry ──────────────────────────────────────────
 export const CUSTOM_ICONS = {
-  takeoff: null,             // TODO Phase 2: custom 1.5px aviation takeoff icon
-  landing: null,             // TODO Phase 2: custom 1.5px aviation touchdown/landing icon
-  runway: null,              // TODO Phase 2: runway centerline & thresholds
-  tower: null,               // TODO Phase 2: control tower silhouette
-  altitude: null,            // TODO Phase 2: vertical altimeter / barometric strata
-  'vertical-rate-up': null,  // TODO Phase 2: climbing rate arrow glyph
-  'vertical-rate-down': null,// TODO Phase 2: descending rate arrow glyph
-  heading: null,             // TODO Phase 2: heading rose / compass needle
-  squawk: null,              // TODO Phase 2: transponder pulse / octal beacon
-  gate: null,                // TODO Phase 2: terminal jetway / stand gate
-  delay: null,               // TODO Phase 2: schedule delta / clock warning
-  'route-arc': null,         // TODO Phase 2: great-circle orbital route arc
+  takeoff: TakeoffIcon,
+  landing: LandingIcon,
+  runway: RunwayIcon,
+  tower: TowerIcon,
+  altitude: AltitudeIcon,
+  'vertical-rate-up': VerticalRateUpIcon,
+  'vertical-rate-down': VerticalRateDownIcon,
+  heading: HeadingIcon,
+  squawk: SquawkIcon,
+  gate: GateIcon,
+  delay: DelayIcon,
+  'route-arc': RouteArcIcon,
 } as const;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -135,15 +149,14 @@ export function Icon({
     );
   }
 
-  // Custom icon slot fallback (rendered as clean placeholder until Phase 2)
   if (name in CUSTOM_ICONS) {
-    // Return empty placeholder box of exact dimensions
+    const CustomComponent = CUSTOM_ICONS[name as CustomIconName];
     return (
-      <span
-        className={`inline-block border border-dashed border-[var(--ink-4)] rounded-[2px] opacity-60 ${className}`}
-        style={{ width: size, height: size }}
-        title={`Custom aviation icon: ${name} (Phase 2 TODO)`}
-        aria-label={ariaLabel || `Custom icon ${name}`}
+      <CustomComponent
+        size={size}
+        strokeWidth={strokeWidth}
+        className={className}
+        aria-label={ariaLabel}
         aria-hidden={ariaHidden}
       />
     );
