@@ -33,7 +33,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
   return (
     <div className="w-full flex flex-col gap-1.5">
       {label && (
-        <label className="mono-label text-[11px] text-[var(--ink-3)] font-medium">
+        <label className="mono-label">
           {label}
         </label>
       )}
@@ -53,11 +53,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(function Inp
             'border border-[var(--line-strong)] px-3.5 text-sm transition-all',
             'placeholder:text-[var(--ink-4)] placeholder:font-normal',
             'hover:border-[var(--ink-3)]',
-            'focus:border-[var(--signal)] focus:outline-none focus:ring-1 focus:ring-[var(--signal)]',
+            // Keep border feedback on all focus; global :focus-visible provides the 2px signal ring
+            'focus:border-[var(--signal)] focus:outline-none',
             icon ? 'pl-9' : '',
             clearable && hasValue ? 'pr-9' : '',
             mono ? 'font-mono text-[13px] tracking-tight' : 'font-sans',
-            error ? 'border-[var(--bad)] focus:border-[var(--bad)] focus:ring-[var(--bad)]' : '',
+            error ? 'border-[var(--bad)] focus:border-[var(--bad)]' : '',
             disabled ? 'opacity-50 cursor-not-allowed bg-[var(--paper-2)]' : '',
             className,
           ].filter(Boolean).join(' ')}

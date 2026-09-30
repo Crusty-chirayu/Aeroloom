@@ -180,57 +180,110 @@ export default function DevKitPage() {
             <span className="mono-label text-[11px]">85% Neutral + Vermilion Signal Accent</span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            {[
-              { name: '--paper', hex: '#F6F4EF', text: 'Page Background' },
-              { name: '--paper-2', hex: '#EFECE4', text: 'Recessed Surface' },
-              { name: '--surface', hex: '#FFFFFF', text: 'Cards / Panels' },
-              { name: '--surface-2', hex: '#FBFAF7', text: 'Hover Secondary' },
-              { name: '--ink', hex: '#0E1116', text: 'Primary Text' },
-              { name: '--ink-2', hex: '#3B4250', text: 'Secondary Text' },
-              { name: '--ink-3', hex: '#6E7686', text: 'Meta / AA on Paper' },
-              { name: '--ink-4', hex: '#A3A9B5', text: 'Placeholder / Disabled' },
-              { name: '--signal', hex: '#FF4F1F', text: 'Primary Signal CTA' },
-              { name: '--signal-ink', hex: '#C93A10', text: 'Accent Ink on Light' },
-              { name: '--sky', hex: '#2B62F0', text: 'Altitude / Sky' },
-              { name: '--ok', hex: '#1F9D6B', text: 'Positive Status' },
-              { name: '--warn', hex: '#E8A317', text: 'Caution Status' },
-              { name: '--bad', hex: '#D64545', text: 'Emergency / Alert' },
-            ].map((col) => (
-              <div key={col.name} className="border border-[var(--line)] rounded-[var(--r-md)] bg-[var(--surface)] p-3 space-y-2">
+          {/* Primary palette — rendered as a continuous altitude strip */}
+          <div className="space-y-1.5">
+            <span className="mono-label text-[11px] text-[var(--ink-3)]">SURFACE + INK PALETTE · Horizontal Altitude Band</span>
+            {/* The strip: each swatch is a tall vertical band, labels at bottom — like a barometer scale */}
+            <div className="flex h-20 rounded-[var(--r-md)] overflow-hidden border border-[var(--line)] shadow-[var(--sh-1)]">
+              {[
+                { name: '--paper',    hex: '#F6F4EF', label: 'PAPER',    dark: false },
+                { name: '--paper-2',  hex: '#EFECE4', label: 'PAPER-2',  dark: false },
+                { name: '--surface',  hex: '#FFFFFF',  label: 'SURFACE',  dark: false },
+                { name: '--surface-2',hex: '#FBFAF7', label: 'SURFACE-2',dark: false },
+                { name: '--ink-4',    hex: '#A3A9B5', label: 'INK-4',    dark: false },
+                { name: '--ink-3',    hex: '#6E7686', label: 'INK-3',    dark: true  },
+                { name: '--ink-2',    hex: '#3B4250', label: 'INK-2',    dark: true  },
+                { name: '--ink',      hex: '#0E1116', label: 'INK',      dark: true  },
+              ].map((col, i, arr) => (
                 <div
-                  className="h-12 w-full rounded-[var(--r-sm)] border border-[var(--line)]"
+                  key={col.name}
+                  className="flex-1 flex flex-col justify-end px-1.5 py-1.5 group relative"
                   style={{ backgroundColor: `var(${col.name})` }}
-                />
-                <div>
-                  <div className="font-mono text-xs font-semibold text-[var(--ink)]">{col.name}</div>
-                  <div className="font-mono text-[11px] text-[var(--ink-3)]">{col.hex}</div>
-                  <div className="text-[11px] text-[var(--ink-2)] truncate mt-0.5">{col.text}</div>
+                  title={`${col.name}: ${col.hex}`}
+                >
+                  {/* Hairline divider between bands */}
+                  {i < arr.length - 1 && (
+                    <div className="absolute right-0 top-0 bottom-0 w-px bg-black/10" />
+                  )}
+                  <div
+                    className="font-mono text-[9px] font-semibold leading-none truncate"
+                    style={{ color: col.dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.45)' }}
+                  >
+                    {col.label}
+                  </div>
+                  <div
+                    className="font-mono text-[8px] leading-none truncate mt-0.5"
+                    style={{ color: col.dark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.3)' }}
+                  >
+                    {col.hex}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+
+          {/* Status signal palette — compact strip */}
+          <div className="space-y-1.5">
+            <span className="mono-label text-[11px] text-[var(--ink-3)]">SIGNAL + STATUS PALETTE</span>
+            <div className="flex h-14 rounded-[var(--r-md)] overflow-hidden border border-[var(--line)] shadow-[var(--sh-1)]">
+              {[
+                { name: '--signal',      hex: '#FF4F1F', label: 'SIGNAL',      dark: true },
+                { name: '--signal-ink',  hex: '#C93A10', label: 'SIGNAL-INK',  dark: true },
+                { name: '--sky',         hex: '#2B62F0', label: 'SKY',         dark: true },
+                { name: '--ok',          hex: '#1F9D6B', label: 'OK',          dark: true },
+                { name: '--warn',        hex: '#E8A317', label: 'WARN',        dark: false },
+                { name: '--bad',         hex: '#D64545', label: 'BAD',         dark: true },
+              ].map((col, i, arr) => (
+                <div
+                  key={col.name}
+                  className="flex-1 flex flex-col justify-end px-1.5 py-1.5 relative"
+                  style={{ backgroundColor: `var(${col.name})` }}
+                  title={`${col.name}: ${col.hex}`}
+                >
+                  {i < arr.length - 1 && (
+                    <div className="absolute right-0 top-0 bottom-0 w-px bg-black/20" />
+                  )}
+                  <div className="font-mono text-[9px] font-semibold leading-none truncate text-white/80">
+                    {col.label}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Altitude Strata Ramp */}
-          <div className="space-y-2 pt-2">
-            <span className="mono-label text-[11px] text-[var(--ink-3)]">Altitude Strata Telemetry Ramp (--alt-0 → --alt-5)</span>
-            <div className="grid grid-cols-6 gap-2">
+          <div className="space-y-1.5 pt-1">
+            <span className="mono-label text-[11px] text-[var(--ink-3)]">ALTITUDE STRATA TELEMETRY RAMP (--alt-0 → --alt-5)</span>
+            <div className="flex h-16 rounded-[var(--r-md)] overflow-hidden border border-[var(--line)] shadow-[var(--sh-1)]">
               {[
-                { name: '--alt-0', label: 'Ground / 0-2k', hex: '#FF4F1F' },
-                { name: '--alt-1', label: 'Terminal / 2k-10k', hex: '#F5A524' },
-                { name: '--alt-2', label: 'Transition / 10k-20k', hex: '#7BC96F' },
-                { name: '--alt-3', label: 'Low Cruise / 20k-30k', hex: '#2FB7C9' },
-                { name: '--alt-4', label: 'High Cruise / 30k-40k', hex: '#2B62F0' },
-                { name: '--alt-5', label: 'Stratosphere / >40k', hex: '#6B3FD1' },
-              ].map((alt) => (
-                <div key={alt.name} className="rounded-[var(--r-sm)] p-2.5 text-white" style={{ backgroundColor: `var(${alt.name})` }}>
-                  <div className="font-mono text-[11px] font-bold">{alt.name}</div>
-                  <div className="text-[10px] font-mono opacity-90 truncate">{alt.label}</div>
+                { name: '--alt-0', label: 'GND / 0–2k',    sub: 'Signal' },
+                { name: '--alt-1', label: 'TERM / 2k–10k', sub: 'Amber' },
+                { name: '--alt-2', label: 'TRANS / 10–20k', sub: 'Green' },
+                { name: '--alt-3', label: 'LO-CRZ / 20–30k', sub: 'Cyan' },
+                { name: '--alt-4', label: 'HI-CRZ / 30–40k', sub: 'Sky' },
+                { name: '--alt-5', label: 'STRAT / >40k',    sub: 'Violet' },
+              ].map((alt, i, arr) => (
+                <div
+                  key={alt.name}
+                  className="flex-1 flex flex-col justify-end px-1.5 py-1.5 relative"
+                  style={{ backgroundColor: `var(${alt.name})` }}
+                  title={alt.name}
+                >
+                  {i < arr.length - 1 && (
+                    <div className="absolute right-0 top-0 bottom-0 w-px bg-black/20" />
+                  )}
+                  <div className="font-mono text-[9px] font-bold leading-none truncate text-white">
+                    {alt.name}
+                  </div>
+                  <div className="font-mono text-[8px] leading-none truncate mt-0.5 text-white/70">
+                    {alt.label}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         </section>
+
 
 
         {/* ─────────────────────────────────────────────────────────────────
