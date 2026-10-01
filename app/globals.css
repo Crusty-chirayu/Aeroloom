@@ -153,13 +153,13 @@ a:hover {
 }
 
 .maplibregl-ctrl-attrib a {
-  color: var(--sky) !important;
-  text-decoration: none !important;
+  color: #1A4BBD !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
 }
 
 .maplibregl-ctrl-attrib a:hover {
   color: var(--signal-ink) !important;
-  text-decoration: underline !important;
 }
 
 .maplibregl-ctrl-scale {

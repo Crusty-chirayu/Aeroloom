@@ -35,7 +35,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     'disabled:bg-[var(--ink-4)] disabled:border-[var(--ink-4)]',
   ].join(' '),
   signal: [
-    'bg-[var(--signal)] text-white border border-[var(--signal)]',
+    'bg-[var(--signal-cta,var(--signal))] text-white border border-[var(--signal-cta,var(--signal))]',
     'hover:bg-[var(--signal-ink)] hover:border-[var(--signal-ink)]',
     'disabled:bg-[var(--ink-4)] disabled:border-[var(--ink-4)]',
   ].join(' '),

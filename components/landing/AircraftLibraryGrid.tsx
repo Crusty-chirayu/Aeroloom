@@ -94,7 +94,7 @@ export function AircraftLibraryGrid() {
                 <div className="space-y-0.5 border-t border-[var(--line)] pt-2 font-mono">
                   <div className="font-bold text-xs text-[var(--ink)] flex items-center justify-between">
                     <span className="truncate pr-1">{meta.name}</span>
-                    <span className="text-[10px] text-[var(--signal)] shrink-0">{meta.typicalWingspanM}m</span>
+                    <span className="text-[10px] text-[var(--signal-ink)] shrink-0">{meta.typicalWingspanM}m</span>
                   </div>
                   <div className="text-[10px] text-[var(--ink-3)] truncate">
                     {meta.exampleModels.slice(0, 2).join(', ')}
@@ -108,7 +108,7 @@ export function AircraftLibraryGrid() {
         {/* Live Technical Blueprint Preview (5-col) */}
         <div className="lg:col-span-5 space-y-4">
           <div className="flex items-center justify-between font-mono text-xs text-[var(--ink-3)]">
-            <span className="mono-label text-[10px] text-[var(--signal)] font-bold">
+            <span className="mono-label text-[10px] text-[var(--signal-ink)] font-bold">
               ENGINEERING BLUEPRINT VIEW
             </span>
             <span>{activeMeta.name.toUpperCase()}</span>
@@ -131,7 +131,7 @@ export function AircraftLibraryGrid() {
             </div>
             <div className="flex justify-between">
               <span className="text-[var(--ink-3)]">ICAO TYPE DESIGNATORS</span>
-              <span className="font-bold text-[var(--signal)]">175+ RESOLVED CODES</span>
+              <span className="font-bold text-[var(--signal-ink)]">175+ RESOLVED CODES</span>
             </div>
           </div>
         </div>

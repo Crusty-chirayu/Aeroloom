@@ -183,7 +183,11 @@ export function SplitFlapAirportBoard() {
               }`}
             >
               {h.code}
-              <span className="hidden sm:inline font-normal text-[10px] ml-1 opacity-70">
+              <span
+                className={`hidden sm:inline font-normal text-[10px] ml-1 ${
+                  activeHubIndex === idx ? 'text-[var(--paper)]' : 'text-[var(--ink-3)]'
+                }`}
+              >
                 ({h.city})
               </span>
             </button>
@@ -217,7 +221,7 @@ export function SplitFlapAirportBoard() {
         <div className="overflow-x-auto pb-2">
           <div className="min-w-[700px] space-y-3">
             {/* Column labels */}
-            <div className="grid grid-cols-12 text-[10px] font-mono font-bold text-neutral-500 tracking-widest uppercase px-1">
+            <div className="grid grid-cols-12 text-[10px] font-mono font-bold text-neutral-400 tracking-widest uppercase px-1">
               <span className="col-span-2">FLIGHT</span>
               <span className="col-span-5">DESTINATION</span>
               <span className="col-span-2">TIME</span>

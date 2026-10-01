@@ -172,7 +172,7 @@ export function FollowFlightSection() {
               key={beat.id}
               className="p-6 rounded-[var(--r-lg)] bg-[var(--surface)] border border-[var(--line-strong)] space-y-4 shadow-sm"
             >
-              <div className="mono-label text-[10px] text-[var(--signal)] font-bold">
+              <div className="mono-label text-[10px] text-[var(--signal-ink)] font-bold">
                 {beat.stage}
               </div>
               <h3 className="font-serif text-2xl text-[var(--ink)]">{beat.title}</h3>
@@ -330,7 +330,7 @@ export function FollowFlightSection() {
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--signal)]" />
-                <span className="mono-label text-[11px] font-bold text-[var(--signal)]">
+                <span className="mono-label text-[11px] font-bold text-[var(--signal-ink)]">
                   {currentBeat.stage}
                 </span>
               </div>
@@ -366,7 +366,7 @@ export function FollowFlightSection() {
 
                 <div className="p-2.5 rounded bg-[var(--paper)] border border-[var(--line)]">
                   <span className="mono-label text-[9px] text-[var(--ink-3)] block">REMAINING</span>
-                  <span className="font-mono text-base sm:text-lg font-bold text-[var(--signal)] tabular-nums">
+                  <span className="font-mono text-base sm:text-lg font-bold text-[var(--signal-ink)] tabular-nums">
                     {currentDist.toLocaleString()}
                   </span>
                   <span className="text-[9px] font-mono text-[var(--ink-3)] block">NM</span>

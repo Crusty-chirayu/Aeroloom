@@ -43,7 +43,7 @@ export function TrustAndDataSection() {
           <p className="text-xs text-[var(--ink-2)] leading-relaxed">
             Every radar blip is physically received by community Software Defined Radio (SDR) antennae via airplanes.live and adsb.lol open feeders.
           </p>
-          <div className="pt-2 text-[10px] font-mono text-[var(--ok)] font-semibold flex items-center gap-1.5">
+          <div className="pt-2 text-[10px] font-mono text-[var(--ok-ink)] font-semibold flex items-center gap-1.5">
             <Icon name="check" size={12} />
             <span>ZERO SYNTHETIC OR SIMULATED TRAFFIC</span>
           </div>
@@ -60,7 +60,7 @@ export function TrustAndDataSection() {
             Spatial bounding boxes are quantized to 0.05° grid bins. Duplicate concurrent client queries are collapsed into a single upstream call to protect volunteer nodes.
           </p>
           <div className="pt-2 text-[10px] font-mono text-[var(--ink-3)] flex items-center gap-1.5">
-            <Icon name="shield-check" size={12} className="text-[var(--ok)]" />
+            <Icon name="shield-check" size={12} className="text-[var(--ok-ink)]" />
             <span>COMMUNITY FEEDER PROTECTION</span>
           </div>
         </div>
@@ -75,7 +75,7 @@ export function TrustAndDataSection() {
           <p className="text-xs text-[var(--ink-2)] leading-relaxed">
             Vector tiles from OpenFreeMap and OpenStreetMap are served keyless and tracker-free. Zero ad beacons, zero third-party telemetry analytics, and zero paywalls.
           </p>
-          <div className="pt-2 text-[10px] font-mono text-[var(--ok)] font-semibold flex items-center gap-1.5">
+          <div className="pt-2 text-[10px] font-mono text-[var(--ok-ink)] font-semibold flex items-center gap-1.5">
             <Icon name="check" size={12} />
             <span>ODbL OPEN DATABASE LICENSE COMPLIANT</span>
           </div>

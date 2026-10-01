@@ -100,7 +100,7 @@ export function HeroSection({
           <span className="font-semibold text-[var(--ink)]">187</span>
           <span className="text-[var(--ink-3)]">SOVEREIGN AIRSPACES</span>
           <span className="text-[var(--ink-4)]">·</span>
-          <span className="font-semibold text-[var(--ok)]">3s</span>
+          <span className="font-semibold text-[var(--ok-ink)]">3s</span>
           <span className="text-[var(--ink-3)]">TELEMETRY REFRESH</span>
         </div>
 

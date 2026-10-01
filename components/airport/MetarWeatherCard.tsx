@@ -103,6 +103,7 @@ export function MetarWeatherCard({
             <span className="absolute left-1 text-[7px] font-mono text-[var(--ink-4)]">W</span>
             {/* Rotated Wind Arrow */}
             <div
+              role="img"
               className="w-full h-full flex items-center justify-center transition-transform duration-500"
               style={{ transform: `rotate(${windDir}deg)` }}
               aria-label={`Wind direction ${windDir} degrees`}

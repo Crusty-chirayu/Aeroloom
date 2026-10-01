@@ -12,8 +12,8 @@
 | **Phase 3** | Map page: MapLibre basemap, 60fps interpolation, flight panel, filters | **DONE** (commit `bfa7c1f`) | 133/133 tests pass, ZERO lint warnings, 50/50 viewports pass, 8 verified screenshots |
 | **Phase 4** | Flight, Airport, Search, Data pages | **DONE** (commit `49820e3`) | Editorial layouts for /flight/[id], /airport/[icao], /airports, /search, /about/data |
 | **Phase 5A**| Landing page hero & pinned 300vh section | **DONE** (commit `0b9636e`) | 14 verified screenshots, LCP 1.13s, zero overflow, full-scrub storytelling |
-| **Phase 5B**| Landing page remaining sections (Bento, Split-Flap, Specimen, Trust, Footer) | **DONE** | 141/141 tests pass, 0 lint warnings, 50/50 viewports pass, 11 verified screenshots |
-| **Phase 6** | Polish, QA, Accessibility, Lighthouse, Cleanup | **IN PROGRESS** | Global polish, axe-core a11y audit, motion tuning, final acceptance |
+| **Phase 5B**| Landing page remaining sections (Bento, Split-Flap, Specimen, Trust, Footer) | **DONE** (commit `cf1fe73`) | 141/141 tests pass, 0 lint warnings, 50/50 viewports pass, 11 verified screenshots |
+| **Phase 6** | Polish, QA, Accessibility, Lighthouse, Cleanup & Final Production Readiness | **DONE** | 100% WCAG AA axe-core pass, 0 TS errors, 0 lint warnings, 141/141 tests pass, 50/50 overflow pass |
 
 ---
 
@@ -653,6 +653,63 @@ Build the remaining sections of the flagship landing page per DESIGN_SPEC.md §7
 5. **Weakness 5 (Type Safety & Canonical Naming)**: `AircraftLibraryGrid.tsx` initially referenced `'business_jet'` instead of canonical `'bizjet'`.
    - *Fix*: Refactored category keys to strictly match `lib/map/silhouettes/types.ts` with direct access to `meta.name` and `meta.exampleModels`.
 
+---
 
+## Phase 6 Execution & Final Production Readiness Report
 
+### 1. Polish & QA Architecture Completed
+1. **100% WCAG 2.1 AA Accessibility Clean Sweep (`scripts/audit-accessibility.mjs`)**:
+   - Automated axe-core audits executed across all 7 primary user-facing routes (`/`, `/map`, `/airports`, `/search`, `/about/data`, `/flight/DAL397`, `/airport/KJFK`).
+   - Resolved all color-contrast violations by tuning `--ink-3` (`#525A69`), introducing high-contrast status text tokens (`--ok-ink: #116943`, `--warn-ink: #8A5200`, `--bad-ink: #A82525`, `--signal-ink: #B32E0A`), and a dedicated CTA button token (`--signal-cta: #D33A0E`, 4.6:1 contrast against `#FFFFFF`).
+   - Fixed `link-in-text-block` in MapLibre attribution controls by establishing global underlines (`.maplibregl-ctrl-attrib a { text-decoration: underline; }`).
+   - Resolved `aria-prohibited-attr` by adding `role="img"` to rotating wind directional gauges with `aria-label`.
+   - **Result: 0 critical issues, 0 serious issues across all 7 routes.**
 
+2. **Network Resilience & Designed Offline Banner (`components/ui/OfflineBanner.tsx`)**:
+   - Implemented zero-cascade network state subscription using React 19 `useSyncExternalStore` listening to browser `online` and `offline` events.
+   - Designed high-contrast editorial notification strip mounted globally in `app/layout.tsx`.
+
+3. **Search Engine Optimization & Metadata (`app/robots.ts`, `app/sitemap.ts`, `app/opengraph-image.tsx`)**:
+   - `robots.ts`: Allows all public crawlers, disallows `/api/` and `/dev/`, links to sitemap.
+   - `sitemap.ts`: Dynamic sitemap covering all core landing, map, directory, and top 100 global aerodromes.
+   - `opengraph-image.tsx`: Server-rendered 1200×630 Open Graph card in Aeroloom Paper & Ink editorial aesthetic with vermilion accents and live typography.
+
+4. **Dev Route Gating & Clean Architecture**:
+   - Gated all dev workbench routes (`/dev/*`) in production builds.
+
+5. **Cross-Browser Verification (`scripts/verify-cross-browser.mjs`)**:
+   - Verified end-to-end functionality (Landing scroll, MapLibre canvas render, Command Palette `⌘K`) in Chromium.
+
+6. **Comprehensive Documentation (`README.md`)**:
+   - Authored complete production README with architectural principles, design tokens, silhouette specs, dead-reckoning engine, provenance register, and test commands.
+
+### 2. Final Verification Gates (All Clean)
+- `npx tsc --noEmit`: **0 errors**
+- `npm run lint`: **0 errors, 0 warnings**
+- `npm test`: **141 / 141 tests pass**
+- `node scripts/check-overflow.mjs`: **50 / 50 checks pass (0px overflow on all 10 routes at 360, 390, 768, 1280, 1728 px)**
+- `node scripts/audit-accessibility.mjs`: **7 / 7 routes pass with 0 critical, 0 serious axe-core violations**
+- `npm run build`: **Clean Next.js Turbopack production compilation of all 20 routes**
+
+### 3. Final Grep Proofs
+1. **Three.js / WebGL heavy libraries**:
+   - `grep -i "three" package.json`: **0 results**
+2. **Tailwind dark mode remnants**:
+   - `grep -r "dark:" components/`: **0 results**
+3. **Cursor-reactive background effects**:
+   - `grep -rn "pointermove" components/`: **0 results**
+4. **Isometric / dotted terrain remnants**:
+   - `grep -rn "isometric" components/`: **0 results**
+   - `grep -rn "dotted" components/`: **0 results**
+
+### 4. Final Self-Critique: 10 Weaknesses Addressed
+1. **Attribution Links Styling**: Map attribution had `text-decoration: none !important`, violating WCAG link-in-text-block. -> Underlined globally with offset in `globals.css`.
+2. **Text Contrast on Vermilion**: `#FF4F1F` background had 3.28:1 contrast against white text for normal font weights. -> Created `--signal-cta: #D33A0E` (4.6:1 against white).
+3. **Tertiary Text Contrast**: `--ink-3: #6E7686` had 4.15:1 contrast against `--paper`. -> Updated to `--ink-3: #525A69` (6.3:1 contrast against paper, 6.9:1 against white).
+4. **Status Text Contrast**: `--ok: #1F9D6B` text on light mint wash had 3.06:1 contrast. -> Created `--ok-ink: #116943` (> 5.5:1 contrast).
+5. **Aria Attributes on Div Elements**: Rotated wind compass had `aria-label` on generic div. -> Added `role="img"`.
+6. **Hub Tab Contrast in Dark Cabinet**: Active tab placed `--ink-3` on dark background. -> Dynamically swapped to `--paper` when active.
+7. **Offline Banner Hydration**: Initial online check caused setState warning. -> Re-architected with `useSyncExternalStore`.
+8. **Edge Runtime Deprecation**: OG image handler used deprecated `edge` runtime. -> Updated to `nodejs` runtime.
+9. **Dev Route Exposure**: Gated internal test benches in production via robots exclusion and route guards.
+10. **Unused Argument Warnings**: Cleaned all unused loop variables across components.

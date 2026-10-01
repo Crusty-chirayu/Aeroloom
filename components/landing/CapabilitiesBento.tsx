@@ -134,7 +134,7 @@ export function CapabilitiesBento() {
         </div>
 
         <Link href="/map" className="shrink-0">
-          <span className="font-mono text-xs font-semibold text-[var(--signal)] hover:underline inline-flex items-center gap-1.5">
+          <span className="font-mono text-xs font-semibold text-[var(--signal-ink)] hover:underline inline-flex items-center gap-1.5">
             Launch live observatory <Icon name="arrow-right" size={14} />
           </span>
         </Link>
@@ -164,8 +164,8 @@ export function CapabilitiesBento() {
             </div>
 
             {/* Static Waypoints */}
-            <div className="absolute top-4 left-6 text-[8px] font-mono text-[var(--ink-4)]">WAYPOINT BEDEK</div>
-            <div className="absolute bottom-4 right-6 text-[8px] font-mono text-[var(--ink-4)]">TERMINAL TMA</div>
+            <div className="absolute top-4 left-6 text-[8px] font-mono text-[var(--ink-3)]">WAYPOINT BEDEK</div>
+            <div className="absolute bottom-4 right-6 text-[8px] font-mono text-[var(--ink-3)]">TERMINAL TMA</div>
 
             {/* Moving Aircraft Marker */}
             <div
@@ -206,12 +206,12 @@ export function CapabilitiesBento() {
               <Icon name="altitude" size={14} className="text-[var(--ink-3)]" />
               <span className="mono-label text-[10px] text-[var(--ink-2)]">HYPSOMETRIC RAMP</span>
             </div>
-            <span className="text-[10px] font-mono text-[var(--ok)] font-semibold">10 STRATA</span>
+            <span className="text-[10px] font-mono text-[var(--ok-ink)] font-semibold">10 STRATA</span>
           </div>
 
           {/* Altitude Strata Stack */}
           <div className="space-y-1.5 p-3 rounded-[var(--r-md)] bg-[var(--paper)] border border-[var(--line)] font-mono text-xs">
-            {ALTITUDE_STRATA.slice(0, 5).map((stratum, idx) => (
+            {ALTITUDE_STRATA.slice(0, 5).map((stratum) => (
               <div
                 key={stratum.label}
                 className="flex items-center justify-between px-2.5 py-1.5 rounded bg-[var(--surface)] border border-[var(--line)] text-[11px]"
@@ -244,10 +244,10 @@ export function CapabilitiesBento() {
         <div className="md:col-span-4 p-6 rounded-[var(--r-lg)] bg-[var(--surface)] border border-[var(--line-strong)] flex flex-col justify-between space-y-6 hover:-translate-y-0.5 hover:shadow-[var(--sh-2)] transition-all duration-300 group">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Icon name="vertical-rate-up" size={14} className="text-[var(--signal)]" />
+              <Icon name="vertical-rate-up" size={14} className="text-[var(--signal-ink)]" />
               <span className="mono-label text-[10px] text-[var(--ink-2)]">VARIOMETER TELEMETRY</span>
             </div>
-            <span className="text-[10px] font-mono text-[var(--signal)] font-bold">CLIMBING</span>
+            <span className="text-[10px] font-mono text-[var(--signal-ink)] font-bold">CLIMBING</span>
           </div>
 
           {/* Variometer Dial Graphic */}
@@ -297,7 +297,7 @@ export function CapabilitiesBento() {
               <Icon name="tower" size={14} className="text-[var(--ink)]" />
               <span className="mono-label text-[10px] text-[var(--ink-2)]">AERODROME TELETYPE</span>
             </div>
-            <Link href="/airports" className="text-[10px] font-mono text-[var(--signal)] hover:underline">
+            <Link href="/airports" className="text-[10px] font-mono text-[var(--signal-ink)] hover:underline">
               ALL AIRPORTS →
             </Link>
           </div>
@@ -315,19 +315,19 @@ export function CapabilitiesBento() {
                 <span className="col-span-3 font-bold text-[var(--ink)]">BAW178</span>
                 <span className="col-span-4 text-[var(--ink-2)]">LHR → JFK</span>
                 <span className="col-span-2 text-[var(--ink-3)]">B24</span>
-                <span className="col-span-3 text-right font-semibold text-[var(--ok)]">AIRBORNE</span>
+                <span className="col-span-3 text-right font-semibold text-[var(--ok-ink)]">AIRBORNE</span>
               </div>
               <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-[var(--surface)] transition-colors">
                 <span className="col-span-3 font-bold text-[var(--ink)]">AIC101</span>
                 <span className="col-span-4 text-[var(--ink-2)]">DEL → JFK</span>
                 <span className="col-span-2 text-[var(--ink-3)]">T3</span>
-                <span className="col-span-3 text-right font-semibold text-[var(--signal)]">CRUISING</span>
+                <span className="col-span-3 text-right font-semibold text-[var(--signal-ink)]">CRUISING</span>
               </div>
               <div className="grid grid-cols-12 px-3 py-2 items-center hover:bg-[var(--surface)] transition-colors">
                 <span className="col-span-3 font-bold text-[var(--ink)]">SIA317</span>
                 <span className="col-span-4 text-[var(--ink-2)]">LHR → SIN</span>
                 <span className="col-span-2 text-[var(--ink-3)]">A12</span>
-                <span className="col-span-3 text-right font-semibold text-[var(--sky)]">DESCENT</span>
+                <span className="col-span-3 text-right font-semibold text-[#1A4BBD]">DESCENT</span>
               </div>
             </div>
           </div>
@@ -364,7 +364,7 @@ export function CapabilitiesBento() {
             <div className="text-[10px] font-mono text-[var(--ink-3)] space-y-1">
               <div className="flex justify-between">
                 <span>INDEX MATCH</span>
-                <span className="text-[var(--ok)]">VERIFIED</span>
+                <span className="text-[var(--ok-ink)]">VERIFIED</span>
               </div>
               <div className="flex justify-between">
                 <span>QUERY LATENCY</span>

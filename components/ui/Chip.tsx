@@ -10,12 +10,12 @@ interface ChipProps {
 }
 
 const variantStyles: Record<ChipVariant, string> = {
-  ok:      'bg-[#E6F5EF] text-[var(--ok)]',
-  warn:    'bg-[#FEF3E2] text-[var(--warn)]',
-  bad:     'bg-[#FBE9E9] text-[var(--bad)]',
+  ok:      'bg-[#E6F5EF] text-[var(--ok-ink)]',
+  warn:    'bg-[#FEF3E2] text-[var(--warn-ink)]',
+  bad:     'bg-[#FBE9E9] text-[var(--bad-ink)]',
   signal:  'bg-[var(--signal-wash)] text-[var(--signal-ink)]',
   neutral: 'bg-[var(--paper-2)] text-[var(--ink-2)]',
-  sky:     'bg-[var(--sky-wash)] text-[var(--sky)]',
+  sky:     'bg-[var(--sky-wash)] text-[#1A4BBD]',
 };
 
 const dotStyles: Record<ChipVariant, string> = {

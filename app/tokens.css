@@ -14,16 +14,17 @@
   /* ---------- Ink (typography) ---------- */
   --ink:          #0E1116;  /* primary text */
   --ink-2:        #3B4250;  /* secondary text */
-  --ink-3:        #6E7686;  /* tertiary / meta (AA on --paper) */
-  --ink-4:        #A3A9B5;  /* disabled / placeholder */
+  --ink-3:        #525A69;  /* tertiary / meta (WCAG AA compliant >= 6:1 on --paper) */
+  --ink-4:        #78808E;  /* subtle captions / disabled */
 
   /* ---------- Lines / Borders ---------- */
   --line:         rgba(14, 17, 22, 0.08);
   --line-strong:  rgba(14, 17, 22, 0.16);
 
   /* ---------- Brand Signal — vermilion ---------- */
-  --signal:       #FF4F1F;  /* primary accent, selected aircraft, CTAs */
-  --signal-ink:   #C93A10;  /* accent text on light backgrounds */
+  --signal:       #FF4F1F;  /* primary accent, selected aircraft */
+  --signal-cta:   #D33A0E;  /* WCAG AA compliant CTA background (4.6:1 against #FFF) */
+  --signal-ink:   #B32E0A;  /* WCAG AA compliant accent text (>= 5:1 on light backgrounds) */
   --signal-wash:  #FFE9E1;  /* accent tint backgrounds */
 
   /* ---------- Sky (secondary — altitude / data) ---------- */
@@ -32,8 +33,11 @@
 
   /* ---------- Status ---------- */
   --ok:           #1F9D6B;
+  --ok-ink:       #116943;  /* WCAG AA text variant on light paper/surface (>= 5.5:1) */
   --warn:         #E8A317;
+  --warn-ink:     #8A5200;  /* WCAG AA text variant */
   --bad:          #D64545;
+  --bad-ink:      #A82525;  /* WCAG AA text variant */
 
   /* ---------- Altitude ramp for trails / markers (low → high) ---------- */
   --alt-0: #FF4F1F;
