@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
 import { AuthUserMenu } from '@/components/user/AuthUserMenu';
+import { AeroloomLogo } from '@/components/brand/AeroloomLogo';
 import type { AircraftCategory } from '@/lib/map/silhouettes/types';
 
 export interface MapFilters {
@@ -72,9 +73,7 @@ export function MapControls({
             title="Aeroloom Home"
             aria-label="Aeroloom Home"
           >
-            <span className="font-serif text-xl font-bold text-[var(--ink)] group-hover:text-[var(--signal)] transition-colors">
-              A
-            </span>
+            <AeroloomLogo variant="mark" size={22} />
           </Link>
 
           {/* Core Navigation Items */}

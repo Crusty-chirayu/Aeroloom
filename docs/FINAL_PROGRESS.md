@@ -14,7 +14,7 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 | **Part D** | Backend hardening (all API routes audited, failure simulation, rate limits, /status, CSP) | **DONE** | Real requests audit, simulated upstream outages, 429 Retry-After, security headers |
 | **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | **DONE** | 153/153 tests pass, RLS schema in `AUTH_SETUP.md`, offline JSON import/export, AuthUserMenu |
 | **Part F** | AI Flight Assistant (OpenRouter free models, grounded retrieval, injection resistance) | **DONE** | 185/185 tests pass, 20 eval scenarios, mock model tests, fallback chain, rate limiting, UI |
-| **Part G** | Brand system (original woven thread SVG mark, favicon set, web manifest, dynamic OG cards) | PENDING | Multi-size critique, manifest, `docs/BRAND.md`, OG generation |
+| **Part G** | Brand system (original woven thread SVG mark, favicon set, web manifest, dynamic OG cards) | **DONE** | 190/190 tests pass, multi-size SVG mark, manifest, `docs/BRAND.md`, OG generation |
 | **Part H** | Legal, footer, developer mark, Case-study About page, feedback contact form | PENDING | `site-config.ts`, `check:launch`, clean legal pages, shared SiteFooter |
 | **Part I** | Tests & quality gates (Playwright e2e, axe-core 0 issues, 50/50 overflow, Lighthouse, secrets) | PENDING | E2E suite, 0 overflow, 0 a11y issues, secrets scan, bundle audit |
 | **Part J** | Self-critique (8+ weaknesses resolved), docs (DEPLOY, OWNER_CHECKLIST), FINAL_REPORT.md | PENDING | Final fresh install, git proof, final delivery report |
@@ -100,16 +100,34 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 
 ---
 
-## 8. Evidence & Audit Records
+## 8. Part G: Execution Log
+
+### Tasks
+- [x] Author original woven thread SVG mark `components/brand/AeroloomLogo.tsx` with variants (`mark`, `lockup`, `monochrome`, `wordmark`) and sizes (`sm`, `md`, `lg`, `xl`).
+- [x] Create universal 32x32 SVG favicon `app/icon.svg` with warm paper backing (`#F6F4EE`) and high-contrast linework for light and dark browser Chrome.
+- [x] Build 180x180 Apple touch icon `app/apple-icon.tsx` using `ImageResponse`.
+- [x] Create Web App Manifest `app/manifest.ts` configured with siteConfig metadata and `#F6F4EE` theme color.
+- [x] Update `app/layout.tsx` with `Viewport` export (`themeColor: '#F6F4EE'`), icons metadata, and OpenGraph/Twitter definitions.
+- [x] Upgrade root `app/opengraph-image.tsx` with woven thread mark and editorial typography.
+- [x] Build dynamic flight OpenGraph card generator `app/flight/[id]/opengraph-image.tsx`.
+- [x] Build dynamic airport OpenGraph card generator `app/airport/[code]/opengraph-image.tsx` with live database lookups.
+- [x] Integrate `AeroloomLogo` into Landing Navigation (`components/landing/LandingNav.tsx`), App Navigation Rail (`components/map/MapControls.tsx`), 404 page (`app/not-found.tsx`), and Error page (`app/error.tsx`).
+- [x] Author comprehensive brand guidelines `docs/BRAND.md` covering philosophy, construction grid, sizing, colors, and anti-patterns.
+- [x] Author brand token specification `lib/brand/brandTokens.ts` and automated test suite `tests/brandSystem.test.ts`.
+
+---
+
+## 9. Evidence & Audit Records
 
 ### Part B FPS Benchmark Result (`scripts/benchmark-radar-fps.mjs`):
 - **Radar OFF:** 16.83 ms/frame (**59 FPS**)
 - **Radar ON:** 16.63 ms/frame (**60 FPS**)
 
-### Quality Gate Results (Parts A–F):
+### Quality Gate Results (Parts A–G):
 - **TypeScript:** 0 errors (`npx tsc --noEmit`)
 - **ESLint:** 0 warnings / 0 errors (`npm run lint`)
-- **Tests:** 185/185 passing (`npm test`)
+- **Tests:** 190/190 passing (`npm test`)
+
 
 
 

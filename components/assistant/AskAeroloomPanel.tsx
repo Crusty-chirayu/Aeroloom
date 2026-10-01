@@ -29,11 +29,19 @@ export function AskAeroloomPanel({
   const [copied, setCopied] = useState(false);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const scrollEndRef = useRef<HTMLDivElement | null>(null);
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
   if (initialQuery !== prevInitialQuery) {
     setPrevInitialQuery(initialQuery);
     setQuery(initialQuery);
   }
+
+  // Auto-scroll when response changes
+  useEffect(() => {
+    if (responseText) {
+      scrollEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [responseText]);
 
   // Focus input when opened
   useEffect(() => {

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
+import { AeroloomLogo } from '@/components/brand/AeroloomLogo';
 
 interface LandingNavProps {
   onOpenSearch?: () => void;
@@ -32,18 +33,13 @@ export function LandingNav({ onOpenSearch }: LandingNavProps) {
         }`}
         aria-label="Primary navigation"
       >
-        {/* Brand Wordmark & Live Signal */}
+        {/* Brand Lockup */}
         <Link
           href="/"
-          className="flex items-center gap-2 group text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)] rounded-full px-1"
+          className="flex items-center group text-[var(--ink)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)] rounded-full px-1"
+          aria-label="Aeroloom Home"
         >
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--signal)] opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--signal)]" />
-          </span>
-          <span className="font-serif text-lg font-normal tracking-tight group-hover:text-[var(--signal)] transition-colors">
-            Aeroloom
-          </span>
+          <AeroloomLogo variant="lockup" size="sm" />
         </Link>
 
         {/* Divider hairline */}

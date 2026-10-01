@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Chip';
 import { SILHOUETTES } from '@/lib/map/silhouettes/paths';
+import { AeroloomLogo } from '@/components/brand/AeroloomLogo';
 
 export default function GlobalError({
   error,
@@ -16,14 +17,14 @@ export default function GlobalError({
   return (
     <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between p-6 md:p-12 max-w-[1360px] mx-auto">
       <header className="flex items-center justify-between border-b border-[var(--line)] pb-4">
+        <Link href="/" className="hover:opacity-85 transition-opacity" aria-label="Aeroloom Home">
+          <AeroloomLogo variant="lockup" size="sm" />
+        </Link>
         <Link href="/map">
           <Button variant="ghost" size="sm" icon="arrow-left">
             Live Radar
           </Button>
         </Link>
-        <span className="mono-label text-[11px] text-[var(--ink-3)]">
-          TELEMETRY ANOMALY
-        </span>
       </header>
 
       <main className="py-16 max-w-xl mx-auto text-center space-y-6">
