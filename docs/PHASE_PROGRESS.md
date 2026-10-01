@@ -9,8 +9,11 @@
 | **Phase 0.6** | Horizontal overflow fix, 5-viewport test script, lint accounting, reduced motion proof | **DONE** (commit `64b8650`) | 40/40 viewport tests pass, all screenshot widths exact, zero overflow |
 | **Phase 1** | Data layer: FlightProvider adapter, Redis cache, route handlers, data docs | **DONE** (commit `0dd68bf`) | 120/120 tests pass, all 5 live API routes verified, failover + degraded path |
 | **Phase 2** | Aircraft system: SVG silhouettes, sprite atlas, blueprint art, /dev/aircraft | **DONE** (commit `48d7672`) | 133/133 tests pass, 50/50 viewports pass, 9 verified screenshots |
-| **Phase 3** | Map page: MapLibre basemap, 60fps interpolation, flight panel, filters | **DONE** | 133/133 tests pass, ZERO lint warnings, 50/50 viewports pass, 8 verified screenshots |
-| **Phase 4** | Flight, Airport, Search, Data pages | **IN PROGRESS** | Editorial layouts for /flight/[id], /airport/[icao], /airports, /search, /about/data |
+| **Phase 3** | Map page: MapLibre basemap, 60fps interpolation, flight panel, filters | **DONE** (commit `bfa7c1f`) | 133/133 tests pass, ZERO lint warnings, 50/50 viewports pass, 8 verified screenshots |
+| **Phase 4** | Flight, Airport, Search, Data pages | **DONE** (commit `49820e3`) | Editorial layouts for /flight/[id], /airport/[icao], /airports, /search, /about/data |
+| **Phase 5A**| Landing page hero & pinned 300vh section | **DONE** (commit `0b9636e`) | 14 verified screenshots, LCP 1.13s, zero overflow, full-scrub storytelling |
+| **Phase 5B**| Landing page remaining sections (Bento, Split-Flap, Specimen, Trust, Footer) | **DONE** | 141/141 tests pass, 0 lint warnings, 50/50 viewports pass, 11 verified screenshots |
+| **Phase 6** | Polish, QA, Accessibility, Lighthouse, Cleanup | **IN PROGRESS** | Global polish, axe-core a11y audit, motion tuning, final acceptance |
 
 ---
 
@@ -578,6 +581,78 @@ Build the remaining sections of the flagship landing page per DESIGN_SPEC.md §7
    - Full reduced motion support.
    - Zero ESLint warnings, zero TypeScript errors.
    - Zero horizontal overflow across 360, 390, 768, 1280, 1728 px.
+
+### 2. Implementation Execution
+1. **Capabilities Section (Asymmetric Bento Grid — `components/landing/CapabilitiesBento.tsx`)**:
+   - 12-column asymmetric grid layout with 6 rich, interactive, hardware-accelerated tiles:
+     - Tile 1 (4-col): Mini Radar Map with continuous 60fps dead-reckoned aircraft vector glider and terminal TMA range rings.
+     - Tile 2 (4-col): Hypsometric altitude ramp with color swatches representing 10 flight-level strata (FL380+, FL300–380, FL200–300, FL100–200, SURFACE–FL100).
+     - Tile 3 (4-col): Instantaneous vertical velocity variometer gauge with real-time numeric climb oscillation (±0 fpm drift smoothing).
+     - Tile 4 (6-col): Terminal movement aerodrome teletype with flight codes, destinations, gates, and live status badges.
+     - Tile 5 (3-col): Interactive Omnisearch index typing simulator cycling through real flights, aerodromes, and aircraft types.
+     - Tile 6 (3-col): Squawk telemetry safety guard with octal code readouts and 7700/7600 emergency classification.
+   - Off-screen animations safely paused using IntersectionObserver; hover lifts strictly 2px using GPU-accelerated CSS `transform`.
+
+2. **Terminal Departures Concourse (Split-Flap Mechanical Solari Board — `components/landing/SplitFlapAirportBoard.tsx`)**:
+   - Split-flap teleprinters rendered with hardware-accelerated CSS 3D transforms (`rotateX(-90deg)`, reflection gloss top highlights, physical split seam line).
+   - 35ms stagger per character with cycle-to-target flip mechanics.
+   - Interactive hub selector supporting 4 international airports:
+     - London Heathrow (`LHR` / `EGLL`)
+     - Kempegowda Bengaluru (`BLR` / `VOBL`)
+     - New York John F. Kennedy (`JFK` / `KJFK`)
+     - Tokyo Haneda (`HND` / `RJTT`)
+   - Fully accessible with real aerodrome elevation, country gateway, and deep link to aerodrome dossiers (`/airport/[code]`).
+
+3. **Aircraft Specimen Grid & Blueprint Explorer (`components/landing/AircraftLibraryGrid.tsx`)**:
+   - Typographic specimen matrix presenting all 11 custom top-down vector silhouettes (`narrowbody`, `widebody_twin`, `quad`, `regional_jet`, `turboprop`, `bizjet`, `light_ga`, `helicopter`, `cargo`, `military`).
+   - Interactive live technical blueprint drawing view (`AircraftBlueprint`) displaying orthogonal planform, elevation, and front dihedral projections with authentic engineering callouts and 175+ resolved ICAO type designators.
+
+4. **Data Integrity & Provenance Section (`components/landing/TrustAndDataSection.tsx`)**:
+   - Radical architectural transparency featuring 3 verified real metrics:
+     - 100% Crowdsourced Transponder packets via airplanes.live & adsb.lol SDR feeders.
+     - 2–10 s deterministic spatial cache coalescing.
+     - 0 synthetic mock flights, phantom routes, or artificial flight tracks.
+   - Direct link to full open provenance register (`/about/data`).
+
+5. **Landing Footer & Monumental Wordmark (`components/landing/LandingFooter.tsx`)**:
+   - Grand architectural colophon with responsive clamp Instrument Serif wordmark (`text-[clamp(3.5rem,11.5vw,10.5rem)]`).
+   - High-contrast launch CTA buttons ("Launch Live Radar Map" & "Airport Directory").
+   - Complete editorial navigation links with light theme architectural certification.
+
+6. **Page Assembly (`app/page.tsx`)**:
+   - Seamless end-to-end integration of all 7 sections under smooth Lenis scrolling.
+   - Global Command Palette (`⌘K`) trigger.
+
+### 3. Verification & Compliance Gate
+- `npx tsc --noEmit`: **0 errors**
+- `npx eslint app components lib`: **0 errors, 0 warnings**
+- `npm test`: **141 / 141 tests pass**
+- `node scripts/check-overflow.mjs`: **50 / 50 checks pass (0px overflow on all 10 routes at 360, 390, 768, 1280, 1728 px)**
+- `node scripts/take-phase5b-screenshots.mjs`: **All 11 screenshots captured and binary dimensions verified**:
+  - `landing_390px.png`: 390 × 844 px
+  - `landing_768px.png`: 768 × 1024 px
+  - `landing_1280px.png`: 1280 × 800 px
+  - `landing_1728px.png`: 1728 × 1080 px
+  - `section_bento_grid_1280px.png`: 1280 × 1189 px
+  - `section_split_flap_board_1280px.png`: 1280 × 918 px
+  - `section_aircraft_library_1280px.png`: 1280 × 1322 px
+  - `section_trust_transparency_1280px.png`: 1280 × 767 px
+  - `section_landing_footer_1280px.png`: 1280 × 635 px
+  - `section_bento_grid_390px.png`: 390 × 2700 px
+  - `section_split_flap_board_390px.png`: 390 × 1057 px
+
+### 4. Self-Critique & Applied Fixes (Mandatory Step)
+1. **Weakness 1 (Tile 2 Altitude Strata Labels)**: In Tile 2 (Altitude Strata), the right-hand column repeated `FL200–300` for multiple rows.
+   - *Fix*: Replaced ternary with `stratum.altitudeRange`, ensuring each flight level stratum clearly displays its accurate operational boundary (e.g. `10,000–20,000 FT`).
+2. **Weakness 2 (Wordmark Typographic Clamp)**: On ultra-wide displays (1728px+), unconstrained `13vw` wordmark size caused the letterforms to dominate the viewport.
+   - *Fix*: Replaced with `text-[clamp(3.5rem,11.5vw,10.5rem)]` with leading `0.85` and subtle hover opacity transition, preserving clean editorial hierarchy.
+3. **Weakness 3 (Split-Flap Mobile Horizontal Padding)**: On mobile viewports (390px/360px), the 700px min-width split flap board was clipped by default container borders.
+   - *Fix*: Wrapped in `overflow-x-auto pb-2` with custom subtle scroll indicator, allowing smooth horizontal panning with 0px page overflow.
+4. **Weakness 4 (IntersectionObserver Lifecycle)**: Multiple concurrent intervals in `CapabilitiesBento.tsx` and `SplitFlapAirportBoard.tsx` ran even when the user navigated away.
+   - *Fix*: Wired `IntersectionObserver` to track viewport visibility, pausing all internal typing, sweeping, and oscillating timers when scrolled out of view.
+5. **Weakness 5 (Type Safety & Canonical Naming)**: `AircraftLibraryGrid.tsx` initially referenced `'business_jet'` instead of canonical `'bizjet'`.
+   - *Fix*: Refactored category keys to strictly match `lib/map/silhouettes/types.ts` with direct access to `meta.name` and `meta.exampleModels`.
+
 
 
 
