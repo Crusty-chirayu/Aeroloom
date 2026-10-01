@@ -482,4 +482,102 @@ Build the flagship landing page at route `/` per DESIGN_SPEC.md §3, §7, §10 a
    - Zero ESLint warnings, zero TypeScript errors, 100% test pass.
    - Playwright screenshots at 390, 768, 1280, 1728 px with verified dimensions.
 
+### Implementation Checklist
+- [x] `components/landing/LandingNav.tsx`: Floating pill nav with transparent-to-paper scroll transitions, brand wordmark, links, search shortcut, and "Open live map" CTA.
+- [x] `components/landing/PreloaderArc.tsx`: Great-circle drawing arc, tiny aircraft silhouette, live airborne counter ticker, vertical wipe reveal, session storage memory, and Esc/click skip.
+- [x] `components/landing/HeroBackgroundMap.tsx`: Non-interactive MapLibre canvas with real live aircraft points, calm scripted corridor camera drift (North Atlantic, Europe, Gulf, India, East Asia), radial mask edge blend, and IntersectionObserver off-screen pause.
+- [x] `components/landing/HeroSection.tsx`: Display-xl headline with roman/italic mix and line-masked reveal, 16-word confident subline, primary CTA with sliding arrow, secondary search trigger, and live mono telemetry strip.
+- [x] `components/landing/FollowFlightSection.tsx`: ~300vh pinned storytelling section with 1:1 scroll scrubbing, great-circle path drawing, tangent aircraft rotation, 3 masked narrative beats (Departure, Cruise, Arrival), and ticking telemetry deck.
+- [x] `app/page.tsx`: Full assembly wrapped in route-isolated `LenisProvider`, connected to `CommandPalette`.
+- [x] Zero cursor/mousemove grep proof: 0 matches for `pointermove`, `mousemove`, `clientX`, `clientY` in landing code.
+- [x] Web Vitals Measurement: LCP = 1,136 ms (< 1.8s budget), CLS = 0 (zero layout shift).
+- [x] Playwright Screenshots: 14 images verified with binary dimension parsing into `docs/screenshots/phase5a/`.
+
+### 2. Lint & Code Quality Status
+- `npx tsc --noEmit`: **0 errors**.
+- `npm run lint`: **0 errors, 0 warnings** (completely clean!).
+- `npm test`: **141 / 141 tests passing** (38 suites).
+- `npm run build`: **Compiled successfully in 3.5s**; all 17 routes generated and statically optimized.
+
+### 3. Horizontal Overflow Validation (Real Outputs)
+```
+Checking horizontal overflow across 10 routes at 5 viewports...
+Checking /               : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/kit        : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/aircraft   : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/icons      : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /map            : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /search         : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /airports       : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /about/data     : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /flight/DAL397  : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /airport/KJFK   : ✓ PASS [360, 390, 768, 1280, 1728]
+
+--- OVERFLOW CHECK SUMMARY ---
+Passed: 50 / 50 (100%)
+SUCCESS: All routes passed zero horizontal overflow check at all target viewports!
+```
+
+### 4. Verified Screenshot Evidence (`docs/screenshots/phase5a/`)
+All 14 PNG file headers verified with binary dimension parsing:
+- `landing_hero_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `landing_midpin_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `landing_endpin_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `landing_preloader_1280px.png` (1280 × 800 px)
+- `landing_reduced_motion_1280px.png` (1280 × 800 px)
+
+### 5. Self-Critique & Applied Fixes (Mandatory Step)
+1. **Weakness 1 (Floating Pill Nav Overlap on Pinned Section)**: On viewports with shorter heights, the fixed floating pill nav slightly occluded the top header of `FollowFlightSection`.
+   - *Fix*: Increased top padding on the pinned section to `pt-24 sm:pt-28`, ensuring the floating navigation pill always floats freely above content without overlap.
+2. **Weakness 2 (Pinned Container Collapse on Quick Scroll)**: Using dynamic ScrollTrigger pin-spacers without a native CSS sticky container caused the scroll position to jump directly into the interim gateway section.
+   - *Fix*: Added explicit `h-[300vh]` on the container with `sticky top-0 h-screen max-h-screen bg-[var(--paper)]` and a direct native scroll progress listener, guaranteeing silky 1:1 scrubbed transitions across all browsers and test runners.
+3. **Weakness 3 (Mobile Headline Sizing on Pinned Story Card)**: At 390px, the 36px headline consumed too much vertical height relative to the radar track card.
+   - *Fix*: Scaled headline responsively (`text-2xl sm:text-3xl lg:text-4xl`), giving ample breathing room for the dynamic SVG altitude profile.
+4. **Weakness 4 (Interim Gateway Flex Row Overflow at 768px)**: The gateway transition block flex row forced 672px text plus 538px buttons side-by-side at 768px, causing a 47px horizontal overflow.
+   - *Fix*: Switched breakpoint to `lg:flex-row`, with `flex-col sm:flex-row` and `w-full sm:w-auto` for action buttons, achieving 0px overflow across all viewports.
+5. **Weakness 5 (Status Footnote Edge Alignment on Mobile)**: The bottom metadata footnote sat tight against the viewport bottom.
+   - *Fix*: Added `pb-6` bottom padding and `flex-col sm:flex-row` alignment to keep metadata clear of mobile system gesture areas.
+
+---
+
+## Phase 5B: Landing Page Remaining Sections Implementation Plan
+
+### Goals
+Build the remaining sections of the flagship landing page per DESIGN_SPEC.md §7:
+1. **Capabilities Section (Asymmetric Bento Grid)**:
+   - 12-column asymmetric grid (NOT 3 equal cards) with 6 rich tiles of varying dimensions.
+   - Tile 1 (4-col): Mini Radar Map with live moving aircraft.
+   - Tile 2 (4-col): Rolling Altitude Ramp with color strata indicator.
+   - Tile 3 (4-col): Vertical Rate Gauge with dynamic climb/descent arrows.
+   - Tile 4 (6-col): Airport Arrivals/Departures live telemetry ticker.
+   - Tile 5 (3-col): Interactive Omnisearch simulator with typing animation.
+   - Tile 6 (3-col): Airspace Density & Squawk Status indicator.
+   - Tiles lift 2px with subtle shadow on tile hover only; offscreen animations paused.
+2. **Airport Board (Horizontal Pinned Scroll)**:
+   - Split-flap mechanical departures board in pure CSS/transform (30–50ms stagger per character, NO audio).
+   - Horizontal pinned scroll advancing through 4 real major hub aerodromes:
+     - London Heathrow (LHR / EGLL)
+     - New York John F. Kennedy (JFK / KJFK)
+     - Kempegowda Bengaluru (BLR / VOBL) — India hub
+     - Tokyo Haneda (HND / RJTT)
+3. **Aircraft Library (Typographic Specimen Grid)**:
+   - Precision typographic grid of the 11 Phase 2 custom silhouettes.
+   - Monospace type codes, wingspan, and typical range specifications.
+   - Hovering an aircraft tile reveals its technical blueprint line-drawing.
+4. **Trust & Data Section**:
+   - Honest architectural transparency: transponder feeds, coverage map, latency metrics, and limitations.
+   - 3 verified numbers (e.g. 100% crowdsourced transponders, 2-10s cache coalescing, 0 synthetic mock flights).
+   - Direct link to `/about/data`.
+5. **Final CTA & Footer**:
+   - Full-width Instrument Serif wordmark rising in on enter.
+   - Primary "Open the live map" CTA button.
+   - Minimalist editorial footer links with architectural copyright.
+6. **Strict Non-Negotiables**:
+   - Zero cursor-reactive logic.
+   - Only transform and opacity animations.
+   - Full reduced motion support.
+   - Zero ESLint warnings, zero TypeScript errors.
+   - Zero horizontal overflow across 360, 390, 768, 1280, 1728 px.
+
+
 
