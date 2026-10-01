@@ -73,6 +73,15 @@ function MapViewContent() {
   const [radarTileUrl, setRadarTileUrl] = useState<string | null>(null);
   const [radarOpacity, setRadarOpacity] = useState<number>(0.7);
 
+  const handleToggleRadarVisibility = useCallback(() => {
+    setLayers((prev) => ({ ...prev, radar: false }));
+  }, []);
+
+  const handleRadarFrameChange = useCallback((url: string | null, op: number) => {
+    setRadarTileUrl((prevUrl) => (prevUrl === url ? prevUrl : url));
+    setRadarOpacity((prevOp) => (prevOp === op ? prevOp : op));
+  }, []);
+
   // Command palette search state
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -193,11 +202,8 @@ function MapViewContent() {
       {/* Radar Timeline & Frame Controls */}
       <RadarTimelineControl
         isVisible={layers.radar}
-        onToggleVisibility={() => setLayers((prev) => ({ ...prev, radar: false }))}
-        onFrameChange={(url, op) => {
-          setRadarTileUrl(url);
-          setRadarOpacity(op);
-        }}
+        onToggleVisibility={handleToggleRadarVisibility}
+        onFrameChange={handleRadarFrameChange}
       />
 
       {/* Primary Map Chrome Controls */}

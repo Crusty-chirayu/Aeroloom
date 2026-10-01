@@ -31,6 +31,26 @@ export function RadarTimelineControl({
   // Playback timer ref
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Ref to track last notified frame values to prevent redundant parent callbacks
+  const lastNotifiedRef = useRef<{ url: string | null; opacity: number }>({
+    url: undefined as any,
+    opacity: -1,
+  });
+
+  const notifyFrameChange = useCallback(
+    (tileUrl: string | null, op: number) => {
+      if (
+        lastNotifiedRef.current.url === tileUrl &&
+        lastNotifiedRef.current.opacity === op
+      ) {
+        return;
+      }
+      lastNotifiedRef.current = { url: tileUrl, opacity: op };
+      onFrameChange(tileUrl, op);
+    },
+    [onFrameChange]
+  );
+
   const [fetchTrigger, setFetchTrigger] = useState<number>(0);
 
   const handleRetry = useCallback(() => {
@@ -39,10 +59,9 @@ export function RadarTimelineControl({
     setFetchTrigger((prev) => prev + 1);
   }, []);
 
-  // Initial fetch + 5-minute auto-refresh when visible
+  // 1. Data Fetching + 5-minute auto-refresh when visible
   useEffect(() => {
     if (!isVisible) {
-      onFrameChange(null, opacity);
       return;
     }
 
@@ -65,7 +84,6 @@ export function RadarTimelineControl({
         if (!isMounted) return;
         const msg = err instanceof Error ? err.message : 'Radar temporarily unavailable';
         setError(msg);
-        onFrameChange(null, opacity);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -84,20 +102,20 @@ export function RadarTimelineControl({
       isMounted = false;
       clearInterval(refreshInterval);
     };
-  }, [isVisible, fetchTrigger, opacity, onFrameChange]);
+  }, [isVisible, fetchTrigger]);
 
   // 2. Handle Frame Tile URL Updates to Map
   useEffect(() => {
-    if (!isVisible || !radarData || !radarData.frames[activeFrameIndex]) {
-      onFrameChange(null, opacity);
+    if (!isVisible || error || !radarData || !radarData.frames[activeFrameIndex]) {
+      notifyFrameChange(null, opacity);
       return;
     }
 
     const frame = radarData.frames[activeFrameIndex];
     // Substitute {path} into tileUrlTemplate
     const tileUrl = radarData.tileUrlTemplate.replace('{path}', frame.path);
-    onFrameChange(tileUrl, opacity);
-  }, [isVisible, radarData, activeFrameIndex, opacity, onFrameChange]);
+    notifyFrameChange(tileUrl, opacity);
+  }, [isVisible, error, radarData, activeFrameIndex, opacity, notifyFrameChange]);
 
   // 3. Animation Loop (Scrubbing / Playback)
   useEffect(() => {
