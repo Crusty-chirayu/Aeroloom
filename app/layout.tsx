@@ -75,6 +75,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable}`}
     >
       <body>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--surface)] focus:text-[var(--signal-ink)] focus:font-mono focus:text-xs focus:font-semibold focus:shadow-[var(--sh-2)] focus:rounded-[var(--r-sm)] focus:border focus:border-[var(--signal)] outline-none"
+        >
+          Skip to main content
+        </a>
         <OfflineBanner />
         <AuthProvider>{children}</AuthProvider>
       </body>
