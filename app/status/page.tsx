@@ -128,7 +128,7 @@ export default function StatusPage() {
           <h1 className="font-serif text-4xl sm:text-5xl text-[var(--ink)] tracking-tight">
             System &amp; Pipeline Status
           </h1>
-          <p className="font-mono text-xs text-[var(--ink-3)]">
+          <p className="font-mono text-xs text-[var(--ink-2)]">
             LAST SWEEP: {lastChecked.toLocaleTimeString()} · AUTO-REFRESHES EVERY 30 SECONDS
           </p>
         </div>
@@ -150,7 +150,7 @@ export default function StatusPage() {
               </div>
             </div>
 
-            <div className="text-right font-mono text-xs text-[var(--ink-3)]">
+            <div className="text-right font-mono text-xs text-[var(--ink-2)]">
               <div>UPTIME</div>
               <div className="text-sm font-bold text-[var(--ink)] tabular-nums mt-0.5">
                 {data ? formatUptime(data.uptimeSeconds) : 'Nominal'}
@@ -163,67 +163,67 @@ export default function StatusPage() {
             <div className="p-4 rounded bg-[var(--paper-2)] border border-[var(--line)] space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-semibold text-[var(--ink)]">Primary ADS-B Feed</span>
-                <span className="flex items-center gap-1.5 text-xs text-[var(--ok)] font-medium">
+                <span className="flex items-center gap-1.5 text-xs text-[var(--ok-ink)] font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]" />
                   Active
                 </span>
               </div>
-              <p className="text-xs text-[var(--ink-3)]">airplanes.live 1090 MHz receiver stream</p>
+              <p className="text-xs text-[var(--ink-2)]">airplanes.live 1090 MHz receiver stream</p>
             </div>
 
             <div className="p-4 rounded bg-[var(--paper-2)] border border-[var(--line)] space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-semibold text-[var(--ink)]">Failover Telemetry Stream</span>
-                <span className="flex items-center gap-1.5 text-xs text-[var(--ok)] font-medium">
+                <span className="flex items-center gap-1.5 text-xs text-[var(--ok-ink)] font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]" />
                   Standby / Ready
                 </span>
               </div>
-              <p className="text-xs text-[var(--ink-3)]">adsb.lol automated fallback pipeline</p>
+              <p className="text-xs text-[var(--ink-2)]">adsb.lol automated fallback pipeline</p>
             </div>
 
             <div className="p-4 rounded bg-[var(--paper-2)] border border-[var(--line)] space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-semibold text-[var(--ink)]">Doppler Weather Radar</span>
-                <span className="flex items-center gap-1.5 text-xs text-[var(--ok)] font-medium">
+                <span className="flex items-center gap-1.5 text-xs text-[var(--ok-ink)] font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]" />
                   Active
                 </span>
               </div>
-              <p className="text-xs text-[var(--ink-3)]">RainViewer composite mosaic API</p>
+              <p className="text-xs text-[var(--ink-2)]">RainViewer composite mosaic API</p>
             </div>
 
             <div className="p-4 rounded bg-[var(--paper-2)] border border-[var(--line)] space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-semibold text-[var(--ink)]">Aviation METAR Weather</span>
-                <span className="flex items-center gap-1.5 text-xs text-[var(--ok)] font-medium">
+                <span className="flex items-center gap-1.5 text-xs text-[var(--ok-ink)] font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]" />
                   Active
                 </span>
               </div>
-              <p className="text-xs text-[var(--ink-3)]">aviationweather.gov NOAA observations</p>
+              <p className="text-xs text-[var(--ink-2)]">aviationweather.gov NOAA observations</p>
             </div>
 
             <div className="p-4 rounded bg-[var(--paper-2)] border border-[var(--line)] space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-semibold text-[var(--ink)]">Grounded AI Assistant</span>
-                <span className="flex items-center gap-1.5 text-xs text-[var(--ok)] font-medium">
+                <span className="flex items-center gap-1.5 text-xs text-[var(--ok-ink)] font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]" />
                   Active
                 </span>
               </div>
-              <p className="text-xs text-[var(--ink-3)]">OpenRouter multi-model fallback chain</p>
+              <p className="text-xs text-[var(--ink-2)]">OpenRouter multi-model fallback chain</p>
             </div>
 
             <div className="p-4 rounded bg-[var(--paper-2)] border border-[var(--line)] space-y-1">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-xs font-semibold text-[var(--ink)]">Rate Limiting Shield</span>
-                <span className="flex items-center gap-1.5 text-xs text-[var(--ok)] font-medium">
+                <span className="flex items-center gap-1.5 text-xs text-[var(--ok-ink)] font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-[var(--ok)]" />
                   120 req/min
                 </span>
               </div>
-              <p className="text-xs text-[var(--ink-3)]">Sliding window per-IP quota enforcement</p>
+              <p className="text-xs text-[var(--ink-2)]">Sliding window per-IP quota enforcement</p>
             </div>
           </div>
         </Panel>

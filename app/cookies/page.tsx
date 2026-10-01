@@ -66,7 +66,7 @@ export default function CookiesPage() {
           <h1 className="font-serif text-4xl sm:text-5xl text-[var(--ink)] tracking-tight">
             Cookie &amp; Storage Policy
           </h1>
-          <p className="font-mono text-xs text-[var(--ink-3)]">
+          <p className="font-mono text-xs text-[var(--ink-2)]">
             ZERO AD-TECH · ZERO CROSS-SITE TRACKING · ESSENTIAL ONLY
           </p>
         </div>
@@ -92,17 +92,17 @@ export default function CookiesPage() {
             {storageItems.map((item) => (
               <Panel key={item.key} variant="surface" className="p-5 bg-[var(--surface)] space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] pb-2">
-                  <code className="font-mono text-xs font-bold text-[var(--signal)]">
+                  <code className="font-mono text-xs font-bold text-[var(--signal-ink)]">
                     {item.key}
                   </code>
-                  <span className="font-mono text-[11px] text-[var(--ink-3)] uppercase">
+                  <span className="font-mono text-[11px] text-[var(--ink-2)] uppercase">
                     {item.type} · {item.category}
                   </span>
                 </div>
                 <p className="text-xs sm:text-sm text-[var(--ink-2)]">
                   {item.purpose}
                 </p>
-                <div className="text-[11px] font-mono text-[var(--ink-4)] pt-1">
+                <div className="text-[11px] font-mono text-[var(--ink-2)] pt-1">
                   LIFESPAN: {item.lifespan}
                 </div>
               </Panel>

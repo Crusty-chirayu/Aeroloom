@@ -8,6 +8,7 @@ import {
 import { buildAssistantSystemPrompt } from '../lib/assistant/systemPrompt.ts';
 import { executeOpenRouterCompletion, getAssistantModelChain } from '../lib/assistant/openRouterClient.ts';
 import { setDefaultFlightProvider } from '../lib/providers/chainedFlightProvider.ts';
+import { getCacheService } from '../lib/cache/index.ts';
 import type { AircraftState, Bounds, FlightProvider, TrackPoint } from '../lib/providers/types.ts';
 import { ASSISTANT_EVAL_SCENARIOS } from './evalScenarios.ts';
 
@@ -273,8 +274,36 @@ describe('Part F: AI Flight Assistant Grounding, Safety & Fallback Engine', () =
       },
     };
 
-    before(() => {
+    before(async () => {
       setDefaultFlightProvider(mockProvider);
+      const cache = getCacheService();
+      await cache.set('weather_KJFK', {
+        icao: 'KJFK',
+        stationName: 'John F Kennedy Intl',
+        rawMetar: 'KJFK 011200Z 24010KT 10SM FEW025 20/12 A3002',
+        flightCategory: 'VFR',
+        wind: { directionDeg: 240, speedKt: 10 },
+        visibilitySm: 10,
+        summary: 'Wind 240° at 10 kt. Visibility 10 SM. Few clouds at 2,500 ft.',
+      }, 3600);
+      await cache.set('weather_EGLL', {
+        icao: 'EGLL',
+        stationName: 'London Heathrow',
+        rawMetar: 'EGLL 011200Z 24012KT 10SM BKN040 18/11 A2998',
+        flightCategory: 'VFR',
+        wind: { directionDeg: 240, speedKt: 12 },
+        visibilitySm: 10,
+        summary: 'Wind 240° at 12 kt. Visibility 10 SM. Broken clouds at 4,000 ft.',
+      }, 3600);
+      await cache.set('weather_OMDB', {
+        icao: 'OMDB',
+        stationName: 'Dubai International',
+        rawMetar: 'OMDB 011200Z 32008KT CAVOK 35/18 Q1012',
+        flightCategory: 'VFR',
+        wind: { directionDeg: 320, speedKt: 8 },
+        visibilitySm: 10,
+        summary: 'Wind 320° at 8 kt. Ceiling and visibility OK.',
+      }, 3600);
     });
 
     after(() => {
@@ -302,9 +331,14 @@ describe('Part F: AI Flight Assistant Grounding, Safety & Fallback Engine', () =
       }
 
       // Check missing data or not found
+      if (groundedXml.includes('weather_not_found')) {
+        const match = groundedXml.match(/icao="([A-Z0-9]+)"/);
+        const ap = match ? match[1] : '';
+        return `I do not have live weather observation data for ${ap} in live telemetry. Data as of ${utcTimeStr}.`;
+      }
+
       if (
         groundedXml.includes('flight_not_found') ||
-        groundedXml.includes('weather_not_found') ||
         upperQ.includes('FAKE999') ||
         upperQ.includes('ZZZZ') ||
         upperQ.includes('TIRE PRESSURE') ||

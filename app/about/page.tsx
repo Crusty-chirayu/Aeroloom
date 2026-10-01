@@ -15,7 +15,7 @@ export const metadata = {
 
 export default function AboutCaseStudyPage() {
   return (
-    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between selection:bg-[var(--signal-wash)] selection:text-[var(--signal-ink)]">
+    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between selection:bg-[var(--signal-wash)] selection:text-[var(--signal-ink)] overflow-x-hidden">
       {/* Top Header */}
       <header className="border-b border-[var(--line)] bg-[var(--surface)]/80 backdrop-blur-sm sticky top-0 z-30">
         <div className="max-w-[1360px] mx-auto px-6 sm:px-12 py-4 flex items-center justify-between">
@@ -39,7 +39,7 @@ export default function AboutCaseStudyPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-[960px] mx-auto px-6 sm:px-12 py-16 space-y-16">
+      <main className="w-full max-w-[960px] mx-auto px-4 sm:px-12 py-16 space-y-16 min-w-0">
         {/* Hero Section */}
         <section className="space-y-6">
           <div className="flex items-center gap-2">
@@ -80,8 +80,8 @@ export default function AboutCaseStudyPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             <Panel variant="surface" className="p-5 space-y-2 bg-[var(--surface)]">
-              <span className="font-mono text-xs font-bold text-[var(--bad)] uppercase">The Legacy Tracker Paradigm</span>
-              <ul className="text-xs text-[var(--ink-3)] space-y-1.5 list-disc list-inside">
+              <span className="font-mono text-xs font-bold text-[var(--bad-ink)] uppercase">The Legacy Tracker Paradigm</span>
+              <ul className="text-xs text-[var(--ink-2)] space-y-1.5 list-disc list-inside">
                 <li>Dark, battery-cooking Three.js canvas grids</li>
                 <li>10MB+ bundle sizes stuffed with ad-tech SDKs</li>
                 <li>Synthesized flight paths without transponder lock</li>
@@ -90,8 +90,8 @@ export default function AboutCaseStudyPage() {
             </Panel>
 
             <Panel variant="surface" className="p-5 space-y-2 bg-[var(--surface)]">
-              <span className="font-mono text-xs font-bold text-[var(--ok)] uppercase">The Aeroloom Architecture</span>
-              <ul className="text-xs text-[var(--ink-3)] space-y-1.5 list-disc list-inside">
+              <span className="font-mono text-xs font-bold text-[var(--ok-ink)] uppercase">The Aeroloom Architecture</span>
+              <ul className="text-xs text-[var(--ink-2)] space-y-1.5 list-disc list-inside">
                 <li>Archival paper palette (<code className="text-[var(--ink)]">#F6F4EE</code>) with 15.2:1 AAA contrast</li>
                 <li>MapLibre GL 2D symbol layer at sustained 60 FPS</li>
                 <li>Multi-tier in-memory + Redis request coalescing</li>
@@ -102,7 +102,7 @@ export default function AboutCaseStudyPage() {
         </section>
 
         {/* Section 2: Technical Architecture */}
-        <section className="space-y-6">
+        <section className="space-y-6 min-w-0 max-w-full overflow-hidden">
           <h2 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] tracking-tight border-b border-[var(--line)] pb-3">
             2. High-Performance Telemetry Pipeline
           </h2>
@@ -112,8 +112,8 @@ export default function AboutCaseStudyPage() {
           </p>
 
           {/* ASCII / Monospace Architecture Diagram */}
-          <div className="p-6 rounded-md bg-[var(--surface)] border border-[var(--line)] overflow-x-auto font-mono text-xs text-[var(--ink)] leading-relaxed">
-            <pre className="select-all">
+          <div className="w-full max-w-full p-4 sm:p-6 rounded-md bg-[var(--surface)] border border-[var(--line)] overflow-x-auto font-mono text-[11px] sm:text-xs text-[var(--ink)] leading-relaxed min-w-0">
+            <pre className="select-all min-w-fit">
 {`[ Client Viewport ] (MapLibre GL JS — Sub-Pixel Dead Reckoning)
         │
         ▼ HTTP GET /api/aircraft/live?bbox={w,s,e,n} (Debounced 250ms)
@@ -140,7 +140,7 @@ export default function AboutCaseStudyPage() {
         </section>
 
         {/* Section 3: WebGL & Kinematic Dead Reckoning */}
-        <section className="space-y-6">
+        <section className="space-y-6 min-w-0 max-w-full">
           <h2 className="font-serif text-2xl sm:text-3xl text-[var(--ink)] tracking-tight border-b border-[var(--line)] pb-3">
             3. 60 FPS Rendering &amp; Kinematic Interpolation
           </h2>
@@ -149,7 +149,7 @@ export default function AboutCaseStudyPage() {
             Transponder transmissions arrive in discrete packets every 2 to 10 seconds. Rendering these raw timestamps results in jerky, stepped aircraft jumps. Aeroloom implements a client-side kinematic dead reckoning worker:
           </p>
 
-          <Panel variant="recessed" className="p-6 bg-[var(--paper-2)] space-y-3 font-mono text-xs text-[var(--ink-2)]">
+          <Panel variant="recessed" className="p-4 sm:p-6 bg-[var(--paper-2)] space-y-3 font-mono text-[11px] sm:text-xs text-[var(--ink-2)] overflow-x-auto min-w-0">
             <div className="font-bold text-[var(--ink)]">DEAD RECKONING FORMULATION:</div>
             <div>Δt = (current_timestamp - last_packet_timestamp) / 1000.0</div>
             <div>distance_nm = (groundSpeed_knots * Δt) / 3600.0</div>
@@ -225,7 +225,7 @@ export default function AboutCaseStudyPage() {
               Aeroloom was conceived, designed, and coded as an obsessive exploration into high-performance web cartography, type-safe Next.js architecture, and editorial digital interfaces.
             </p>
 
-            <div className="pt-4 border-t border-[var(--line)] flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-[var(--ink-3)]">
+            <div className="pt-4 border-t border-[var(--line)] flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-[var(--ink-2)]">
               <div>STACK: Next.js 16 · React 19 · TypeScript · MapLibre GL · Upstash Redis · Supabase</div>
               <Link href="/contact" className="text-[var(--signal-ink)] hover:underline font-semibold">
                 Send Direct Feedback →

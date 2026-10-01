@@ -4,15 +4,15 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const VIEWPORT_WIDTHS = [360, 390, 768, 1280, 1728];
 const ROUTES = [
   '/',
-  '/dev/kit',
-  '/dev/aircraft',
-  '/dev/icons',
   '/map',
   '/search',
   '/airports',
+  '/about',
   '/about/data',
   '/flight/DAL397',
   '/airport/KJFK',
+  '/terms',
+  '/privacy',
 ];
 
 async function main() {

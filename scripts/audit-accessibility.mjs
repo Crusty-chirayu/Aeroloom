@@ -8,9 +8,18 @@ const ROUTES = [
   '/map',
   '/airports',
   '/search',
+  '/about',
   '/about/data',
   '/flight/DAL397',
   '/airport/KJFK',
+  '/terms',
+  '/privacy',
+  '/cookies',
+  '/disclaimer',
+  '/accessibility',
+  '/contact',
+  '/credits',
+  '/status',
 ];
 
 async function main() {
@@ -63,6 +72,9 @@ async function main() {
         console.log(`  ✗ ${route.padEnd(20)}: ${criticalOrSerious.length} critical/serious issues found:`);
         criticalOrSerious.forEach((c) => {
           console.log(`     - [${c.impact.toUpperCase()}] ${c.id}: ${c.description} (${c.nodes.length} nodes)`);
+          c.nodes.forEach((n, idx) => {
+            console.log(`       [${idx + 1}] Target: ${n.target.join(' ')} | HTML: ${n.html.slice(0, 100)}`);
+          });
         });
       }
     } catch (err) {

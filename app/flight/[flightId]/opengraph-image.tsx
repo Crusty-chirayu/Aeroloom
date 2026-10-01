@@ -12,10 +12,10 @@ export const contentType = 'image/png';
 export default async function Image({
   params,
 }: {
-  params: Promise<{ id: string }> | { id: string };
+  params: Promise<{ flightId: string }> | { flightId: string };
 }) {
   const resolvedParams = await params;
-  const rawId = resolvedParams?.id ? decodeURIComponent(resolvedParams.id) : 'FLIGHT';
+  const rawId = resolvedParams?.flightId ? decodeURIComponent(resolvedParams.flightId) : 'FLIGHT';
   const displayId = rawId.toUpperCase();
 
   return new ImageResponse(
@@ -152,7 +152,7 @@ export default async function Image({
               }}
             >
               <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#878D96', letterSpacing: '0.06em' }}>
-                IDENTIFIER / HEX
+                IDENTIFIER / CALLSIGN
               </span>
               <span style={{ fontSize: '20px', fontFamily: 'monospace', fontWeight: 700, color: '#0E1116', marginTop: '4px' }}>
                 {displayId}

@@ -87,7 +87,7 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
   // Render Designed Not Airborne / Not Found State
   if (!isLoading && (errorStatus === 'not_found' || !aircraft)) {
     return (
-      <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between p-6 md:p-12 max-w-[1360px] mx-auto">
+      <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between p-4 sm:p-6 md:p-12 max-w-[1360px] mx-auto w-full min-w-0 overflow-x-hidden">
         <header className="flex items-center justify-between border-b border-[var(--line)] pb-4">
           <Link href="/map">
             <Button variant="ghost" size="sm" icon="arrow-left">
@@ -99,7 +99,7 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
           </span>
         </header>
 
-        <main className="py-16 max-w-2xl mx-auto text-center space-y-6">
+        <main className="py-12 sm:py-16 w-full max-w-2xl mx-auto text-center space-y-6 min-w-0 px-2 sm:px-0">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--paper-2)] border border-[var(--line)] mx-auto mb-2 text-[var(--ink-3)]">
             <svg viewBox="0 0 64 64" width="36" height="36" className="fill-current opacity-40">
               <path d={SILHOUETTES.unknown.bodyPath} />
@@ -189,7 +189,7 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
   const destCode = getAirportCode(aircraft?.route?.destination) || 'DEST';
 
   return (
-    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] overflow-x-hidden">
       {/* Editorial App Header */}
       <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-4">
         <div className="max-w-[1360px] mx-auto flex items-center justify-between gap-2">
@@ -280,7 +280,7 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
               </div>
               <div>
                 <span className="mono-label text-[10px] text-[var(--ink-3)] block">REFRESH CYCLE</span>
-                <span className="font-bold text-[var(--ok)] text-base">
+                <span className="font-bold text-[var(--ok-ink)] text-base">
                   {aircraft?.ageSeconds !== undefined ? `${Math.round(aircraft.ageSeconds)}s ago` : 'Live'}
                 </span>
               </div>

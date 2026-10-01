@@ -102,7 +102,7 @@ export function FlightProfileCharts({
         {hoveredPoint && (
           <div className="font-mono text-xs flex items-center gap-3 text-[var(--ink-2)]">
             <span>T: <strong className="text-[var(--ink)]">{hoveredPoint.time}</strong></span>
-            <span>ALT: <strong className="text-[var(--signal)]">{hoveredPoint.alt.toLocaleString()} FT</strong></span>
+            <span>ALT: <strong className="text-[var(--signal-ink)]">{hoveredPoint.alt.toLocaleString()} FT</strong></span>
             <span>SPD: <strong className="text-[var(--sky)]">{hoveredPoint.speed} KT</strong></span>
           </div>
         )}

@@ -106,7 +106,7 @@ export default function CreditsPage() {
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-xs text-[var(--ink-3)] hover:text-[var(--ink)] underline"
+                  className="font-mono text-xs text-[var(--ink-2)] hover:text-[var(--ink)] underline font-medium"
                 >
                   Visit Source ↗
                 </a>
@@ -114,7 +114,7 @@ export default function CreditsPage() {
               <p className="text-sm text-[var(--ink-2)] leading-relaxed">
                 {item.attribution}
               </p>
-              <div className="text-[11px] font-mono text-[var(--ink-4)]">
+              <div className="text-[11px] font-mono text-[var(--ink-2)]">
                 LICENSE: {item.license}
               </div>
             </Panel>

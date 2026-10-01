@@ -57,7 +57,7 @@ check('app/manifest.ts', existsSync(join(root, 'app', 'manifest.ts')));
 check('app/robots.ts', existsSync(join(root, 'app', 'robots.ts')));
 check('app/sitemap.ts', existsSync(join(root, 'app', 'sitemap.ts')));
 check('app/opengraph-image.tsx', existsSync(join(root, 'app', 'opengraph-image.tsx')));
-check('app/flight/[id]/opengraph-image.tsx', existsSync(join(root, 'app', 'flight', '[id]', 'opengraph-image.tsx')));
+check('app/flight/[flightId]/opengraph-image.tsx', existsSync(join(root, 'app', 'flight', '[flightId]', 'opengraph-image.tsx')));
 check('app/airport/[code]/opengraph-image.tsx', existsSync(join(root, 'app', 'airport', '[code]', 'opengraph-image.tsx')));
 check('components/brand/AeroloomLogo.tsx', existsSync(join(root, 'components', 'brand', 'AeroloomLogo.tsx')));
 check('components/footer/SiteFooter.tsx', existsSync(join(root, 'components', 'footer', 'SiteFooter.tsx')));

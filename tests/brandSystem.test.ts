@@ -38,11 +38,11 @@ describe('Brand System & Assets Verification (Part G)', () => {
 
   test('OpenGraph card generators exist for home, flight, and airport routes', () => {
     const rootOg = join(process.cwd(), 'app', 'opengraph-image.tsx');
-    const flightOg = join(process.cwd(), 'app', 'flight', '[id]', 'opengraph-image.tsx');
+    const flightOg = join(process.cwd(), 'app', 'flight', '[flightId]', 'opengraph-image.tsx');
     const airportOg = join(process.cwd(), 'app', 'airport', '[code]', 'opengraph-image.tsx');
 
     assert.ok(existsSync(rootOg), 'app/opengraph-image.tsx must exist');
-    assert.ok(existsSync(flightOg), 'app/flight/[id]/opengraph-image.tsx must exist');
+    assert.ok(existsSync(flightOg), 'app/flight/[flightId]/opengraph-image.tsx must exist');
     assert.ok(existsSync(airportOg), 'app/airport/[code]/opengraph-image.tsx must exist');
 
     const rootContent = readFileSync(rootOg, 'utf-8');
