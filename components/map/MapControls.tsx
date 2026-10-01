@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Icon } from '@/components/ui/Icon';
+import { AuthUserMenu } from '@/components/user/AuthUserMenu';
 import type { AircraftCategory } from '@/lib/map/silhouettes/types';
 
 export interface MapFilters {
@@ -265,6 +266,9 @@ export function MapControls({
               </div>
             )}
           </div>
+
+          {/* User Account / Guest Persistence Menu */}
+          <AuthUserMenu />
         </div>
       </div>
 

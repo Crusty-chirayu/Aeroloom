@@ -11,6 +11,7 @@ import { AirportTerminalMap } from '@/components/airport/AirportTerminalMap';
 import { MetarWeatherCard } from '@/components/airport/MetarWeatherCard';
 import { AirportRadarScope } from '@/components/airport/AirportRadarScope';
 import { AirportRadarScopeBentoTile } from '@/components/airport/AirportRadarScopeBentoTile';
+import { AuthUserMenu } from '@/components/user/AuthUserMenu';
 import type { AircraftState, WeatherReport } from '@/lib/providers/types';
 
 interface AirportPageProps {
@@ -175,6 +176,7 @@ export default function AirportDetailPage({ params }: AirportPageProps) {
                 Radar
               </Button>
             </Link>
+            <AuthUserMenu />
           </div>
         </div>
       </header>

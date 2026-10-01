@@ -12,7 +12,7 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 | **Part B** | Live weather radar on map (RainViewer API terms, frame cache, timeline, 60fps pan/zoom) | **DONE** | Terms in `data-sources.md`, frame cache, radar timeline, frame rate benchmarks |
 | **Part C** | ATC-style radar scope on airport pages (range rings, live blips, rotating sweep, table fallback) | **DONE** | 60fps with 300 blips, reduced motion, bento tile preview, accessible table |
 | **Part D** | Backend hardening (all API routes audited, failure simulation, rate limits, /status, CSP) | **DONE** | Real requests audit, simulated upstream outages, 429 Retry-After, security headers |
-| **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | PENDING | Unit & e2e tests, RLS cross-user isolation, `docs/AUTH_SETUP.md` |
+| **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | **DONE** | 153/153 tests pass, RLS schema in `AUTH_SETUP.md`, offline JSON import/export, AuthUserMenu |
 | **Part F** | AI Flight Assistant (OpenRouter free models, grounded retrieval, injection resistance) | PENDING | 20 eval scenarios, mock model tests, fallback chain, rate limiting |
 | **Part G** | Brand system (original woven thread SVG mark, favicon set, web manifest, dynamic OG cards) | PENDING | Multi-size critique, manifest, `docs/BRAND.md`, OG generation |
 | **Part H** | Legal, footer, developer mark, Case-study About page, feedback contact form | PENDING | `site-config.ts`, `check:launch`, clean legal pages, shared SiteFooter |
@@ -73,16 +73,28 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 
 ---
 
-## 6. Evidence & Audit Records
+## 6. Part E: Execution Log
+
+### Tasks
+- [x] Create comprehensive `docs/AUTH_SETUP.md` with PostgreSQL schema, RLS policies for `profiles`, `saved_flights`, `watchlists`, `alert_rules`, and `airspace_alerts`, OAuth provider config (Google, GitHub), and guest-sync protocol.
+- [x] Create offline JSON backup & restore modal `components/user/ImportWatchlistDialog.tsx` with drag-and-drop, format validation, schema checks (`lib/storage/bundleValidator.ts`), and merge vs replace strategies.
+- [x] Build `components/user/AuthUserMenu.tsx` providing seamless Guest (local device persistence) vs Authenticated (Supabase cloud) switching, OAuth triggers, sign out, and Import/Export modal access.
+- [x] Integrate `AuthUserMenu` into top map controls (`components/map/MapControls.tsx`) and airport header (`app/airport/[code]/page.tsx`).
+- [x] Author test suite `tests/authAndWatchlist.test.ts` verifying bundle validator and LocalDevicePersistenceAdapter export/import lifecycle.
+
+---
+
+## 7. Evidence & Audit Records
 
 ### Part B FPS Benchmark Result (`scripts/benchmark-radar-fps.mjs`):
 - **Radar OFF:** 16.83 ms/frame (**59 FPS**)
 - **Radar ON:** 16.63 ms/frame (**60 FPS**)
 
-### Part C & D Quality Gate Results:
+### Quality Gate Results (Parts A–E):
 - **TypeScript:** 0 errors (`npx tsc --noEmit`)
 - **ESLint:** 0 warnings / 0 errors (`npm run lint`)
-- **Vitest:** 147/147 passing (`npm test`)
+- **Tests:** 153/153 passing (`npm test`)
+
 
 
 
