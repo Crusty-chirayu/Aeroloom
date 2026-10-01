@@ -131,11 +131,14 @@ export async function GET(request: NextRequest) {
     };
   }
 
-  // Check DEV_SAMPLE_TRAFFIC mode
-  const isDevSampleTraffic =
-    process.env.DEV_SAMPLE_TRAFFIC === '1' && process.env.NODE_ENV !== 'production';
+  // Explicit sample/demo mode requested
+  const isExplicitSampleRequested =
+    providerParam === 'sample' ||
+    providerParam === 'demo' ||
+    searchParams.get('sample') === '1' ||
+    searchParams.get('sample') === 'true';
 
-  if (isDevSampleTraffic || providerParam === 'sample') {
+  if (isExplicitSampleRequested) {
     const sampleProvider = new SampleTrafficProvider();
     const states = await sampleProvider.getAircraftInBounds(bounds);
     const reqTime = Date.now();

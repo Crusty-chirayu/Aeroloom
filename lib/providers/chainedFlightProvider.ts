@@ -20,9 +20,9 @@ export class ChainedFlightProvider implements FlightProvider {
       this.providers = [providersOrPrimary, ...(secondary ? [secondary] : [])];
     } else {
       this.providers = [
-        new AdsbFiProvider(),
         new AdsbLolProvider(),
         new AirplanesLiveProvider(),
+        new AdsbFiProvider(),
         new OpenSkyProvider(),
       ];
     }

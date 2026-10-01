@@ -22,7 +22,16 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
-  const setOpen = setControlledOpen || setInternalOpen;
+  const setOpen = React.useCallback(
+    (val: boolean) => {
+      if (setControlledOpen) {
+        setControlledOpen(val);
+      } else {
+        setInternalOpen(val);
+      }
+    },
+    [setControlledOpen]
+  );
   const [search, setSearch] = useState('');
 
   // Keyboard shortcut: Cmd+K / Ctrl+K and '/' shortcut
@@ -41,6 +50,13 @@ export function CommandPalette({
     return () => document.removeEventListener('keydown', down);
   }, [isOpen, setOpen]);
 
+  // Reset search state when palette closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSearch('');
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
@@ -53,8 +69,6 @@ export function CommandPalette({
         onClick={(e) => e.stopPropagation()}
       >
         <Command
-          value={search}
-          onValueChange={setSearch}
           className="flex flex-col w-full focus:outline-none"
         >
           {/* Search Header Bar */}
@@ -96,7 +110,7 @@ export function CommandPalette({
               className="px-2 py-1.5 text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--signal)] [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-semibold"
             >
               <Command.Item
-                value={`Ask Aeroloom AI Assistant: ${search || 'flight telemetry weather airspace'}`}
+                value="Ask Aeroloom AI Assistant flight telemetry weather airspace"
                 onSelect={() => {
                   onTriggerAssistant?.(search);
                   setOpen(false);
