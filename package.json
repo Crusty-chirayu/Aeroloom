@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --test --experimental-strip-types tests/**/*.test.ts",
-    "check:env": "node --experimental-strip-types scripts/validate-supabase.ts"
+    "check:env": "node --experimental-strip-types scripts/validate-supabase.ts",
+    "check:launch": "node scripts/check-launch-readiness.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

@@ -82,3 +82,16 @@ export function absoluteUrl(path = ''): string {
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
   return `${siteConfig.url}${cleanPath}`;
 }
+
+/**
+ * Obfuscates developer email for client-side rendering to deter automated scraping bots
+ */
+export function getObfuscatedEmail(): { user: string; domain: string; full: string } {
+  const parts = siteConfig.developer.email.split('@');
+  return {
+    user: parts[0] || 'chirayujaysawal7',
+    domain: parts[1] || 'gmail.com',
+    full: `${parts[0] || 'chirayujaysawal7'}@${parts[1] || 'gmail.com'}`,
+  };
+}
+

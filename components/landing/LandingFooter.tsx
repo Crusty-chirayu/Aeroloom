@@ -47,6 +47,7 @@ export function LandingFooter() {
         </div>
 
         {/* Minimal Editorial Footer Links & Colophon */}
+        {/* Minimal Editorial Footer Links & Colophon */}
         <div className="border-t border-[var(--line)] pt-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 text-xs font-mono text-[var(--ink-3)]">
           <div className="flex flex-wrap items-center gap-4">
             <Link href="/map" className="hover:text-[var(--ink)] transition-colors">
@@ -57,20 +58,24 @@ export function LandingFooter() {
               Airports
             </Link>
             <span>·</span>
+            <Link href="/about" className="hover:text-[var(--ink)] transition-colors font-medium">
+              Case Study
+            </Link>
+            <span>·</span>
             <Link href="/about/data" className="hover:text-[var(--ink)] transition-colors">
-              Data &amp; Provenance
+              Data &amp; Feeds
             </Link>
             <span>·</span>
-            <Link href="/search" className="hover:text-[var(--ink)] transition-colors">
-              Omnisearch
+            <Link href="/terms" className="hover:text-[var(--ink)] transition-colors">
+              Terms
             </Link>
             <span>·</span>
-            <Link href="/dev/aircraft" className="hover:text-[var(--ink)] transition-colors">
-              Aircraft Silhouettes
+            <Link href="/privacy" className="hover:text-[var(--ink)] transition-colors">
+              Privacy
             </Link>
             <span>·</span>
-            <Link href="/dev/kit" className="hover:text-[var(--ink)] transition-colors">
-              Design Kit
+            <Link href="/status" className="hover:text-[var(--ink)] transition-colors">
+              Status
             </Link>
           </div>
 

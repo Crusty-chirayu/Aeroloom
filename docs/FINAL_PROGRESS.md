@@ -15,7 +15,7 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 | **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | **DONE** | 153/153 tests pass, RLS schema in `AUTH_SETUP.md`, offline JSON import/export, AuthUserMenu |
 | **Part F** | AI Flight Assistant (OpenRouter free models, grounded retrieval, injection resistance) | **DONE** | 185/185 tests pass, 20 eval scenarios, mock model tests, fallback chain, rate limiting, UI |
 | **Part G** | Brand system (original woven thread SVG mark, favicon set, web manifest, dynamic OG cards) | **DONE** | 190/190 tests pass, multi-size SVG mark, manifest, `docs/BRAND.md`, OG generation |
-| **Part H** | Legal, footer, developer mark, Case-study About page, feedback contact form | PENDING | `site-config.ts`, `check:launch`, clean legal pages, shared SiteFooter |
+| **Part H** | Legal, footer, developer mark, Case-study About page, feedback contact form | **DONE** | 194/194 tests pass, `npm run check:launch` passing, full legal suite, SiteFooter |
 | **Part I** | Tests & quality gates (Playwright e2e, axe-core 0 issues, 50/50 overflow, Lighthouse, secrets) | PENDING | E2E suite, 0 overflow, 0 a11y issues, secrets scan, bundle audit |
 | **Part J** | Self-critique (8+ weaknesses resolved), docs (DEPLOY, OWNER_CHECKLIST), FINAL_REPORT.md | PENDING | Final fresh install, git proof, final delivery report |
 
@@ -117,16 +117,40 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 
 ---
 
-## 9. Evidence & Audit Records
+## 9. Part H: Execution Log
+
+### Tasks
+- [x] Refine `lib/site-config.ts` with developer credentials, legal placeholders (`TODO_OWNER`), and obfuscated email helper `getObfuscatedEmail()`.
+- [x] Create universal `components/footer/SiteFooter.tsx` with brand lockup, columns for Airspace, Engineering, and Trust, developer credit links, and live UTC clock.
+- [x] Author comprehensive portfolio Engineering Case Study at `app/about/page.tsx` covering the legacy dark-mode problem, telemetry architecture, 60fps WebGL sprite atlas, request coalescing, and grounded AI flight assistant.
+- [x] Build editorial compliance pages:
+  - `app/terms/page.tsx`: Terms of Service, operational non-reliance directive, and rate limiting boundaries.
+  - `app/privacy/page.tsx`: Privacy Policy, zero ad-tech tracking charter, and local-first guest mode.
+  - `app/cookies/page.tsx`: Storage Key Registry documenting essential session tokens and localStorage keys.
+  - `app/disclaimer/page.tsx`: Critical Flight Safety & Telemetry Disclaimer, line-of-sight boundaries, and radar latency.
+  - `app/accessibility/page.tsx`: WCAG 2.2 Level AA statement, keyboard navigation, contrast ratios, and reduced motion.
+  - `app/contact/page.tsx`: Interactive contact and engineering feedback form with anti-spam honeypot and mailto fallback.
+  - `app/credits/page.tsx`: Upstream attributions (airplanes.live, adsb.lol, NOAA, RainViewer, OpenStreetMap, MapLibre, fonts).
+  - `app/status/page.tsx`: Real-time system and telemetry pipeline status dashboard with auto-refresh.
+- [x] Clean up `components/landing/LandingFooter.tsx`, replacing dev links with production legal and case study links.
+- [x] Register all new legal and platform routes in `app/sitemap.ts`.
+- [x] Author launch readiness script `scripts/check-launch-readiness.mjs` and add `npm run check:launch`.
+- [x] Author automated test suite `tests/legalAndAbout.test.ts`.
+
+---
+
+## 10. Evidence & Audit Records
 
 ### Part B FPS Benchmark Result (`scripts/benchmark-radar-fps.mjs`):
 - **Radar OFF:** 16.83 ms/frame (**59 FPS**)
 - **Radar ON:** 16.63 ms/frame (**60 FPS**)
 
-### Quality Gate Results (Parts A–G):
+### Quality Gate Results (Parts A–H):
+- **Pre-Flight Launch Readiness:** 100% Passed (`npm run check:launch`)
 - **TypeScript:** 0 errors (`npx tsc --noEmit`)
 - **ESLint:** 0 warnings / 0 errors (`npm run lint`)
-- **Tests:** 190/190 passing (`npm test`)
+- **Tests:** 194/194 passing (`npm test`)
+
 
 
 
