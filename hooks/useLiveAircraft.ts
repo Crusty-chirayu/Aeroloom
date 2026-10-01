@@ -57,6 +57,7 @@ export function useLiveAircraft({
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
   const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const consecutiveFailuresRef = useRef<number>(0);
+  const breadcrumbsMapRef = useRef<Map<string, PositionSample[]>>(new Map());
   // Instantiate persistent MapLibre 60FPS dead-reckoning interpolator
   const interpolator = useMemo(() => new AircraftInterpolator(), []);
   const fetchAircraftRef = useRef<() => Promise<void>>(async () => {});

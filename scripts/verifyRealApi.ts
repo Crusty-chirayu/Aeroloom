@@ -21,7 +21,7 @@ interface ApiCallRecord {
   responseTimeMs: number;
 }
 
-const USER_AGENT = 'Aeroloom-FlightTracker/0.1.0 (https://github.com/Crusty-chirayu/Aeroloom; chirayujayaswal7@gmail.com)';
+const USER_AGENT = 'Aeroloom-FlightTracker/0.1.0 (https://github.com/Crusty-chirayu/Aeroloom; chirayujaysawal7@gmail.com)';
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));

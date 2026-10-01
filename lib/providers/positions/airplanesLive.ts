@@ -1,6 +1,6 @@
 import type { AircraftPosition, BoundingBox, PositionQuery, ProviderResponse } from './types.ts';
 
-export const USER_AGENT = 'Aeroloom-FlightTracker/0.1.0 (https://github.com/Crusty-chirayu/Aeroloom; chirayujayaswal7@gmail.com)';
+export const USER_AGENT = 'Aeroloom-FlightTracker/0.1.0 (https://github.com/Crusty-chirayu/Aeroloom; chirayujaysawal7@gmail.com)';
 
 // Default reference location: San Francisco Bay Area (KSFO / KOAK / KSJC metro sector)
 export const DEFAULT_QUERY_LOCATION: PositionQuery = {
