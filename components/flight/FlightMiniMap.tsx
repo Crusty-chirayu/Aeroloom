@@ -64,6 +64,10 @@ export function FlightMiniMap({
           'bottom-right'
         );
 
+        map.on('error', () => {
+          // Gracefully suppress unhandled tile/style errors
+        });
+
         map.on('load', () => {
           if (!isMounted) return;
           setIsLoaded(true);

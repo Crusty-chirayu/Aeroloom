@@ -61,6 +61,10 @@ export function HeroBackgroundMap({ onAirborneCount }: HeroBackgroundMapProps) {
 
         mapRef.current = map;
 
+        map.on('error', () => {
+          // Gracefully suppress unhandled tile/style errors
+        });
+
         map.on('load', async () => {
           if (!isMounted) return;
 

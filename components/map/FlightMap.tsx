@@ -53,6 +53,9 @@ export function FlightMap({
   // Hover state
   const [hoveredAircraft, setHoveredAircraft] = useState<AircraftState | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [basemapUnavailable, setBasemapUnavailable] = useState(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef<number>(0);
 
   // References for values needed in RAF loop to avoid closure capture issues
   const filtersRef = useRef(filters);
@@ -83,6 +86,45 @@ export function FlightMap({
     });
 
     mapRef.current = map;
+
+    // Gracefully handle MapLibre errors so failed tile/style fetches never cause uncaught console errors
+    map.on('error', (e) => {
+      const err = e.error as { status?: number; message?: string; url?: string } | undefined;
+      const eventSourceId = (e as unknown as { sourceId?: string }).sourceId;
+      const isTileOrStyle =
+        eventSourceId === 'openmaptiles' ||
+        (err?.url && (err.url.includes('openfreemap') || err.url.includes('rainviewer') || err.url.includes('tilecache'))) ||
+        (err?.message && (err.message.includes('fetch') || err.message.includes('tile') || err.message.includes('AJAXError')));
+
+      if (isTileOrStyle) {
+        setBasemapUnavailable(true);
+
+        // Retry with backoff (3s, 6s, 12s, max 30s)
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+        const backoffMs = Math.min(3000 * Math.pow(2, retryCountRef.current), 30000);
+        retryCountRef.current += 1;
+
+        retryTimeoutRef.current = setTimeout(() => {
+          if (mapRef.current) {
+            try {
+              const src = mapRef.current.getSource('openmaptiles');
+              if (src && 'reload' in src && typeof (src as unknown as { reload: () => void }).reload === 'function') {
+                (src as unknown as { reload: () => void }).reload();
+              }
+            } catch {
+              // Silently ignore reload attempts
+            }
+          }
+        }, backoffMs);
+      }
+    });
+
+    map.on('sourcedata', (e) => {
+      if (e.sourceId === 'openmaptiles' && e.isSourceLoaded) {
+        setBasemapUnavailable(false);
+        retryCountRef.current = 0;
+      }
+    });
 
     map.on('load', async () => {
       isMapLoadedRef.current = true;
@@ -309,6 +351,7 @@ export function FlightMap({
     });
 
     return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
       if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
       map.remove();
       mapRef.current = null;
@@ -540,9 +583,19 @@ export function FlightMap({
   }, [interpolator]);
 
   return (
-    <div className={`relative w-full h-full overflow-hidden ${className}`}>
-      {/* MapLibre WebGL Canvas Container */}
-      <div ref={containerRef} className="w-full h-full" />
+    <div className={`relative w-full h-full overflow-hidden bg-[#F6F4EE] ${className}`}>
+      {/* MapLibre WebGL Canvas Container over paper background */}
+      <div ref={containerRef} className="w-full h-full bg-[#F6F4EE]" />
+
+      {/* Basemap unavailable notice with retry indicator */}
+      {basemapUnavailable && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+          <div className="px-3 py-1.5 rounded-[var(--r-sm)] bg-[var(--surface)]/95 backdrop-blur-sm border border-[var(--line)] shadow-[var(--sh-1)] flex items-center gap-2 font-mono text-xs text-[var(--ink-2)]">
+            <span className="w-2 h-2 rounded-full bg-[var(--warn)] animate-pulse" />
+            <span>Basemap unavailable, retrying...</span>
+          </div>
+        </div>
+      )}
 
       {/* High-Precision Floating Hover Tag */}
       <MapHoverTag
