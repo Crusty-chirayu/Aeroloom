@@ -24,7 +24,7 @@ import {
   Plane, PlaneTakeoff, PlaneLanding, Navigation, Compass, Globe, Map, MapPin, Radio,
   // Data / Interface
   Activity, BarChart2, Clock, Eye, Filter, Layers, RefreshCw,
-  Settings, Sliders, Star, Bookmark, Download, Upload, Share2,
+  Settings, Sliders, Star, Bookmark, Download, Upload, Share2, Tag, Table,
   // User
   User, LogIn, LogOut,
   // Environment / Weather / Media
@@ -100,6 +100,8 @@ export const LUCIDE_ICONS = {
   x: X,
   'external-link': ArrowUpRight,
   'shield-check': CheckCircle2,
+  tag: Tag,
+  table: Table,
 } as const satisfies Record<string, LucideIcon>;
 
 // ─── Custom Aviation Icons Registry ──────────────────────────────────────────

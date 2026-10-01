@@ -9,6 +9,8 @@ import { Icon } from '@/components/ui/Icon';
 import { getAirportByIata, getAirportByIcao } from '@/lib/airports/airportData';
 import { AirportTerminalMap } from '@/components/airport/AirportTerminalMap';
 import { MetarWeatherCard } from '@/components/airport/MetarWeatherCard';
+import { AirportRadarScope } from '@/components/airport/AirportRadarScope';
+import { AirportRadarScopeBentoTile } from '@/components/airport/AirportRadarScopeBentoTile';
 import type { AircraftState, WeatherReport } from '@/lib/providers/types';
 
 interface AirportPageProps {
@@ -260,7 +262,25 @@ export default function AirportDetailPage({ params }: AirportPageProps) {
           <MetarWeatherCard weather={weather} isLoading={isLoadingWeather} />
         </section>
 
-        {/* Dual Section: Terminal Radar Map & Nearby Traffic */}
+        {/* ATC Radar Scope Section */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="mono-label text-[11px] text-[var(--ink-3)]">
+              AIR TRAFFIC CONTROL (ATC) RADAR SCOPE
+            </span>
+            <span className="text-xs font-mono text-[var(--ink-2)]">
+              PRIMARY / SECONDARY SURVEILLANCE RADAR
+            </span>
+          </div>
+
+          <AirportRadarScope
+            airport={airport}
+            aircraft={traffic}
+            isLoading={isLoadingTraffic}
+          />
+        </section>
+
+        {/* Dual Section: Terminal Radar Map & Bento Tile Preview */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Map Column */}
           <div className="lg:col-span-7 space-y-3">
@@ -276,69 +296,76 @@ export default function AirportDetailPage({ params }: AirportPageProps) {
             <AirportTerminalMap airport={airport} aircraft={traffic} />
           </div>
 
-          {/* Traffic Table Column */}
-          <div className="lg:col-span-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="mono-label text-[11px] text-[var(--ink-3)]">
-                AIRCRAFT NEAR THIS AIRPORT
-              </span>
-              <span className="text-xs font-mono text-[var(--ink-2)]">
-                WITHIN 35 NM
-              </span>
-            </div>
+          {/* Traffic & Bento Column */}
+          <div className="lg:col-span-5 space-y-6">
+            <AirportRadarScopeBentoTile
+              airport={airport}
+              traffic={traffic}
+            />
 
-            <Panel variant="surface" radius="md" padding="md" className="space-y-4 max-h-[400px] overflow-y-auto">
-              {isLoadingTraffic ? (
-                <div className="space-y-3 animate-pulse py-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="h-10 bg-[var(--paper-2)] rounded" />
-                  ))}
-                </div>
-              ) : traffic.length === 0 ? (
-                <div className="py-12 text-center space-y-2">
-                  <div className="w-10 h-10 rounded-full bg-[var(--paper-2)] flex items-center justify-center mx-auto text-[var(--ink-3)]">
-                    <Icon name="radar" size={18} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="mono-label text-[11px] text-[var(--ink-3)]">
+                  AIRCRAFT NEAR THIS AIRPORT
+                </span>
+                <span className="text-xs font-mono text-[var(--ink-2)]">
+                  WITHIN 35 NM
+                </span>
+              </div>
+
+              <Panel variant="surface" radius="md" padding="md" className="space-y-4 max-h-[320px] overflow-y-auto">
+                {isLoadingTraffic ? (
+                  <div className="space-y-3 animate-pulse py-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-10 bg-[var(--paper-2)] rounded" />
+                    ))}
                   </div>
-                  <div className="font-serif text-lg text-[var(--ink)]">Clear Airspace</div>
-                  <p className="text-xs text-[var(--ink-3)] max-w-xs mx-auto">
-                    No transponder-equipped aircraft currently detected within 35 nautical miles of {airport.iata}.
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-[var(--line)]">
-                  {traffic.slice(0, 10).map((ac) => (
-                    <Link
-                      key={ac.id}
-                      href={`/flight/${ac.callsign.toLowerCase()}`}
-                      className="py-2.5 flex items-center justify-between hover:bg-[var(--paper-2)] px-2 -mx-2 rounded transition-colors group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-7 h-7 rounded-full bg-[var(--paper-2)] group-hover:bg-[var(--paper)] flex items-center justify-center text-[var(--ink)] border border-[var(--line)]">
-                          <Icon name="plane" size={14} />
-                        </div>
-                        <div>
-                          <div className="font-mono text-sm font-bold text-[var(--ink)] group-hover:text-[var(--signal)] transition-colors">
-                            {ac.callsign}
+                ) : traffic.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-[var(--paper-2)] flex items-center justify-center mx-auto text-[var(--ink-3)]">
+                      <Icon name="radar" size={18} />
+                    </div>
+                    <div className="font-serif text-lg text-[var(--ink)]">Clear Airspace</div>
+                    <p className="text-xs text-[var(--ink-3)] max-w-xs mx-auto">
+                      No transponder-equipped aircraft currently detected within 35 nautical miles of {airport.iata}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[var(--line)]">
+                    {traffic.slice(0, 10).map((ac) => (
+                      <Link
+                        key={ac.id}
+                        href={`/flight/${ac.callsign.toLowerCase()}`}
+                        className="py-2.5 flex items-center justify-between hover:bg-[var(--paper-2)] px-2 -mx-2 rounded transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-[var(--paper-2)] group-hover:bg-[var(--paper)] flex items-center justify-center text-[var(--ink)] border border-[var(--line)]">
+                            <Icon name="plane" size={14} />
                           </div>
-                          <div className="text-[11px] font-mono text-[var(--ink-3)]">
-                            {ac.typeCode || 'AIRCRAFT'} · {typeof ac.airline === 'object' && ac.airline ? ac.airline.name : ac.airline || 'Commercial'}
+                          <div>
+                            <div className="font-mono text-sm font-bold text-[var(--ink)] group-hover:text-[var(--signal)] transition-colors">
+                              {ac.callsign}
+                            </div>
+                            <div className="text-[11px] font-mono text-[var(--ink-3)]">
+                              {ac.typeCode || 'AIRCRAFT'} · {typeof ac.airline === 'object' && ac.airline ? ac.airline.name : ac.airline || 'Commercial'}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="text-right font-mono text-xs">
-                        <div className="font-semibold text-[var(--ink)]">
-                          {ac.altitudeFt.toLocaleString()} FT
+                        <div className="text-right font-mono text-xs">
+                          <div className="font-semibold text-[var(--ink)]">
+                            {ac.altitudeFt.toLocaleString()} FT
+                          </div>
+                          <div className="text-[11px] text-[var(--ink-3)]">
+                            {ac.groundSpeedKt} KT · {ac.trackDeg}°
+                          </div>
                         </div>
-                        <div className="text-[11px] text-[var(--ink-3)]">
-                          {ac.groundSpeedKt} KT · {ac.trackDeg}°
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </Panel>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+            </div>
           </div>
         </section>
 

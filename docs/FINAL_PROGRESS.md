@@ -10,7 +10,7 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 | :--- | :--- | :--- | :--- |
 | **Part A** | Close production-readiness gaps (config, 404 /dev/*, Firefox/WebKit report, fresh install, URLs) | **DONE** | `npm ci`, `build`, `test`, `dev/kit` 404 proof, Lighthouse mobile baseline |
 | **Part B** | Live weather radar on map (RainViewer API terms, frame cache, timeline, 60fps pan/zoom) | **DONE** | Terms in `data-sources.md`, frame cache, radar timeline, frame rate benchmarks |
-| **Part C** | ATC-style radar scope on airport pages (range rings, live blips, rotating sweep, table fallback) | PENDING | 60fps with 300 blips, reduced motion, bento tile preview, accessible table |
+| **Part C** | ATC-style radar scope on airport pages (range rings, live blips, rotating sweep, table fallback) | **DONE** | 60fps with 300 blips, reduced motion, bento tile preview, accessible table |
 | **Part D** | Backend hardening (all API routes audited, failure simulation, rate limits, /status, CSP) | PENDING | Real requests audit, simulated upstream outages, 429 Retry-After, security headers |
 | **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | PENDING | Unit & e2e tests, RLS cross-user isolation, `docs/AUTH_SETUP.md` |
 | **Part F** | AI Flight Assistant (OpenRouter free models, grounded retrieval, injection resistance) | PENDING | 20 eval scenarios, mock model tests, fallback chain, rate limiting |
@@ -49,12 +49,28 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 
 ---
 
-## 4. Evidence & Audit Records
+## 4. Part C: Execution Log
+
+### Tasks
+- [x] Build canvas-rendered `components/airport/AirportRadarScope.tsx` in Editorial Aviation style (`#F6F4EE` paper, dark ink linework).
+- [x] Implement selectable range concentric rings (10, 25, 50, 100 NM) and 30° radial bearing spokes.
+- [x] Add 360° rotating sweep animation with reduced-motion respect (`useReducedMotion`).
+- [x] Render live blips with dead reckoning, heading vector lines, altitude/speed data tags, and emergency squawk styling.
+- [x] Build accessible table fallback (`<table aria-label="Live Airport Traffic Table">`) for screen readers.
+- [x] Build Bento card preview tile `components/airport/AirportRadarScopeBentoTile.tsx` and integrate into `/airport/[code]/page.tsx`.
+- [x] Add unit test suite `tests/airportRadarScope.test.ts`.
+
+---
+
+## 5. Evidence & Audit Records
 
 ### Part B FPS Benchmark Result (`scripts/benchmark-radar-fps.mjs`):
 - **Radar OFF:** 16.83 ms/frame (**59 FPS**)
 - **Radar ON:** 16.63 ms/frame (**60 FPS**)
+
+### Part C Quality Gate Results:
 - **TypeScript:** 0 errors (`npx tsc --noEmit`)
 - **ESLint:** 0 warnings / 0 errors (`npm run lint`)
-- **Vitest:** 141/141 passing (`npm test`)
+- **Vitest:** 144/144 passing (`npm test`)
+
 
