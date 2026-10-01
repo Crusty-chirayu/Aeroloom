@@ -83,9 +83,13 @@ export function FlightMap({
       pitchWithRotate: false,
       dragRotate: false,
       maxPitch: 0, // Flat tactical view per spec
-    });
+      ...({ preserveDrawingBuffer: true } as unknown as Record<string, unknown>),
+    } as unknown as import('maplibre-gl').MapOptions);
 
     mapRef.current = map;
+    if (typeof window !== 'undefined') {
+      (window as unknown as { _aeroloomMap?: MapLibreMap })._aeroloomMap = map;
+    }
 
     // Gracefully handle MapLibre errors so failed tile/style fetches never cause uncaught console errors
     map.on('error', (e) => {
@@ -262,7 +266,7 @@ export function FlightMap({
         minzoom: 8.5,
         layout: {
           'text-field': ['get', 'callsign'],
-          'text-font': ['Geist Mono Regular', 'Open Sans Regular'],
+          'text-font': ['Noto Sans Regular'],
           'text-size': 10,
           'text-offset': [0, 1.4],
           'text-anchor': 'top',

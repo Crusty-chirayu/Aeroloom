@@ -4,18 +4,17 @@ This document registers every third-party data provider, telemetry stream, and t
 
 ---
 
-## 1. Live Flight Telemetry: airplanes.live
+## 1. Live Flight Telemetry: adsb.fi (Primary Open Data API)
 
 | Property | Detail |
 |---|---|
-| **Primary URL** | `https://api.airplanes.live/v2/` |
-| **Active Endpoints** | `/point/{lat}/{lon}/{radius}` (spatial queries), `/hex/{hex}` (aircraft telemetry & history), `/callsign/{callsign}` (flight search) |
+| **Primary URL** | `https://opendata.adsb.fi/api/v2/` |
+| **Active Endpoints** | `/lat/{lat}/lon/{lon}/dist/{dist}` (spatial queries, max 250 NM), `/callsign/{callsign}`, `/hex/{hex}` |
 | **Function in Aeroloom** | Primary live ADS-B telemetry provider for airborne and ground positions, ground speed, track, barometric altitude, and squawk. |
-| **Rate Limits** | Fair-use public tier. Recommends ≥2–5 second polling intervals per client. Exceeded thresholds return `contact@airplanes.live` challenge. |
-| **Server Mitigation** | Aeroloom employs an Upstash Redis/Memory 5-second cache, request coalescing (collapsing simultaneous bounds requests into 1 upstream call), and bounds quantization to minimize upstream load. |
-| **Terms & Licensing** | Volunteer-operated ADS-B feeder collective. Free for open-source, non-commercial, personal, and research applications. High-volume commercial usage requires a dedicated feeder or contractual agreement. |
-| **Commercial Use** | **Restricted / Clarification Required**: Free for community/non-commercial tiers. Commercial deployment requires prior written consent or hosting private receiver nodes. |
-| **Required Attribution** | "Flight data courtesy of airplanes.live community feeders." Rendered on `/about/data` and product footnotes. |
+| **Rate Limits** | Free community open data tier. Server-side caching (5s TTL) and coalescing strictly applied. |
+| **Terms & Licensing** | Open-access ADS-B collective data. |
+| **Commercial Use** | Permissible under community fair use. |
+| **Required Attribution** | "Flight data courtesy of the adsb.fi open feeder network." |
 
 ---
 
@@ -24,12 +23,39 @@ This document registers every third-party data provider, telemetry stream, and t
 | Property | Detail |
 |---|---|
 | **Primary URL** | `https://api.adsb.lol/v2/` |
-| **Active Endpoints** | `/point/{lat}/{lon}/{radius}`, `/hex/{hex}`, `/callsign/{callsign}` |
-| **Function in Aeroloom** | Automated secondary failover provider in `ChainedFlightProvider`. Engaged if `airplanes.live` returns HTTP 5xx, network timeout, or rate-limit challenge. |
+| **Active Endpoints** | `/point/{lat}/{lon}/{radius}` (max 250 NM), `/hex/{hex}`, `/callsign/{callsign}` |
+| **Function in Aeroloom** | Automated secondary failover provider in `ChainedFlightProvider`. Engaged if primary returns HTTP error, timeout, or rate-limit challenge. |
 | **Rate Limits** | Community fair use. Server-side caching (5 s TTL) and coalescing strictly applied. |
 | **Terms & Licensing** | Open-source community ADS-B aggregation network. Dedicated to unencumbered open aviation data. |
 | **Commercial Use** | Permissible under fair-use guidelines for community and educational applications. Commercial reselling requires running feeder infrastructure. |
 | **Required Attribution** | "ADS-B telemetry aggregated via adsb.lol open collective." |
+
+---
+
+## 3. Live Flight Telemetry: airplanes.live
+
+| Property | Detail |
+|---|---|
+| **Primary URL** | `https://api.airplanes.live/v2/` |
+| **Active Endpoints** | `/point/{lat}/{lon}/{radius}` (spatial queries), `/hex/{hex}`, `/callsign/{callsign}` |
+| **Function in Aeroloom** | Secondary/tertiary feeder collective provider. Circuit breaker automatically trips for 60s if HTTP 403 contact challenge is returned. Config slot `AIRPLANES_LIVE_API_KEY` supported. |
+| **Rate Limits** | Requires application allowlisting via `contact@airplanes.live`. |
+| **Terms & Licensing** | Volunteer-operated ADS-B feeder collective. Free for open-source, non-commercial, personal, and research applications with prior email authorization. |
+| **Required Attribution** | "Flight data courtesy of airplanes.live community feeders." |
+
+---
+
+## 4. Live Flight Telemetry: OpenSky Network
+
+| Property | Detail |
+|---|---|
+| **Primary URL** | `https://opensky-network.org/api/` |
+| **Active Endpoints** | `/states/all?lamin={s}&lomin={w}&lamax={n}&lomax={e}` |
+| **Function in Aeroloom** | Tertiary open-access ADS-B failover provider. Supports anonymous querying and client credentials via `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET`. |
+| **Rate Limits** | Anonymous: 10-second temporal resolution, bounding box clamped <= 25 sq deg. |
+| **Terms & Licensing** | Creative Commons Attribution 4.0 International (CC BY 4.0). Non-commercial open research data. |
+| **Required Attribution** | "Data provided by The OpenSky Network (https://opensky-network.org)." |
+
 
 ---
 

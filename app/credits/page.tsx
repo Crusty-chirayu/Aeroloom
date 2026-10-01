@@ -14,11 +14,11 @@ export const metadata = {
 export default function CreditsPage() {
   const attributions = [
     {
-      title: 'airplanes.live',
-      role: 'Primary Live ADS-B Feeder Collective',
-      license: 'Open-Access Non-Commercial / Research',
-      attribution: 'Live aircraft positions, Mode-S transponder interrogations, and squawk telemetry provided courtesy of the global volunteer feeding collective at airplanes.live.',
-      url: 'https://airplanes.live',
+      title: 'adsb.fi',
+      role: 'Primary Live ADS-B Open Telemetry Network',
+      license: 'Community Open Data Feed',
+      attribution: 'Real-time aircraft positions, transponder interrogations, and flight metrics provided courtesy of the adsb.fi open feeder network.',
+      url: 'https://adsb.fi',
     },
     {
       title: 'adsb.lol',
@@ -26,6 +26,20 @@ export default function CreditsPage() {
       license: 'Open Source Community Feed',
       attribution: 'Real-time transponder failover aggregation provided by the open feeder network at adsb.lol.',
       url: 'https://adsb.lol',
+    },
+    {
+      title: 'airplanes.live',
+      role: 'Global ADS-B Feeder Collective',
+      license: 'Open-Access Non-Commercial / Research',
+      attribution: 'Live aircraft positions, Mode-S transponder interrogations, and squawk telemetry provided courtesy of the global volunteer feeding collective at airplanes.live.',
+      url: 'https://airplanes.live',
+    },
+    {
+      title: 'OpenSky Network',
+      role: 'Tertiary ADS-B Research Network',
+      license: 'Creative Commons Attribution 4.0 International (CC BY 4.0)',
+      attribution: 'Global aircraft state vectors provided by The OpenSky Network (https://opensky-network.org).',
+      url: 'https://opensky-network.org',
     },
     {
       title: 'NOAA / Aviation Weather Center',

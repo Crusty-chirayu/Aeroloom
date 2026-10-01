@@ -10,6 +10,7 @@ import { RadarTimelineControl } from '@/components/map/RadarTimelineControl';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 import { AskAeroloomPanel } from '@/components/assistant/AskAeroloomPanel';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
 import type { Bounds } from '@/lib/providers/types';
 
 // Sector coordinate mappings
@@ -38,6 +39,7 @@ function MapViewContent() {
     isLoading,
     isStale,
     isDegraded,
+    isSampleData,
     error,
     selectedAircraft,
     selectedAircraftId,
@@ -263,10 +265,19 @@ function MapViewContent() {
         }}
       />
 
+      {/* ─── DEV SAMPLE TRAFFIC CHIP ──────────────────────────── */}
+      {isSampleData && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+          <Chip variant="warn" dot>
+            Sample data (DEV_SAMPLE_TRAFFIC)
+          </Chip>
+        </div>
+      )}
+
       {/* ─── SYSTEM STATUS BANNERS (Non-blocking notifications) ─────────────── */}
       <div className="fixed bottom-6 left-4 md:left-24 z-20 flex flex-col gap-2 max-w-sm pointer-events-none">
         {/* Degraded State Banner */}
-        {isDegraded && (
+        {isDegraded && !error && (
           <div className="pointer-events-auto bg-amber-50 border border-amber-300 text-amber-900 px-3 py-2 rounded-sm text-xs font-mono shadow-md flex items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
@@ -282,7 +293,7 @@ function MapViewContent() {
         )}
 
         {/* Stale Airspace Banner */}
-        {isStale && !isDegraded && (
+        {isStale && !isDegraded && !error && (
           <div className="pointer-events-auto bg-[var(--paper)] border border-[var(--line-strong)] text-[var(--ink-2)] px-3 py-2 rounded-sm text-xs font-mono shadow-md flex items-center justify-between gap-3 animate-in fade-in">
             <span>Updating Airspace Contacts...</span>
             <button onClick={refresh} className="underline font-semibold text-[var(--ink)]">
@@ -293,13 +304,16 @@ function MapViewContent() {
 
         {/* Telemetry Error Banner */}
         {error && (
-          <div className="pointer-events-auto bg-red-50 border border-red-300 text-red-900 px-3 py-2 rounded-sm text-xs font-mono shadow-md flex items-center justify-between gap-3 animate-in fade-in">
-            <span>{error}</span>
+          <div className="pointer-events-auto bg-amber-50 border border-amber-300 text-amber-900 px-3 py-2 rounded-sm text-xs font-mono shadow-md flex items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>{error}</span>
+            </div>
             <button
               onClick={refresh}
-              className="text-red-800 underline font-semibold hover:text-red-950"
+              className="text-amber-800 underline font-semibold hover:text-amber-950"
             >
-              Reconnect
+              Retry
             </button>
           </div>
         )}

@@ -1,31 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  DEFAULT_QUERY_LOCATION,
-} from '@/lib/providers/positions/airplanesLive';
-import {
-  validateSpatialQuery,
-} from '@/lib/providers/positions/validation';
+import { DEFAULT_QUERY_LOCATION } from '@/lib/providers/positions/airplanesLive';
+import { validateSpatialQuery } from '@/lib/providers/positions/validation';
 import { getCacheService, globalCoalescer, globalRateLimiter } from '@/lib/cache';
 import { getDefaultFlightProvider } from '@/lib/providers/chainedFlightProvider';
 import { AirplanesLiveProvider } from '@/lib/providers/airplanesLiveProvider';
 import { AdsbLolProvider } from '@/lib/providers/adsbLolProvider';
+import { AdsbFiProvider } from '@/lib/providers/adsbFiProvider';
+import { OpenSkyProvider } from '@/lib/providers/openSkyProvider';
+import { SampleTrafficProvider } from '@/lib/providers/sampleTrafficProvider';
 import type { Bounds, AircraftState, FlightProvider } from '@/lib/providers/types';
 import { quantizeBounds, getBoundsCacheKey } from '@/lib/providers/quantization';
 import { toAircraftPosition } from '@/lib/providers/types';
 
-const POSITIVE_CACHE_TTL_SEC = 5; // 5 seconds TTL per spec
+const POSITIVE_CACHE_TTL_SEC = 5; // 5 seconds TTL
 const NEGATIVE_CACHE_TTL_SEC = 3;
 
 interface CachedPayload {
   success: boolean;
-  aircraft: ReturnType<typeof toAircraftPosition>[];
+  aircraft: (ReturnType<typeof toAircraftPosition> & { lat: number; lon: number })[];
   states: AircraftState[];
   totalFound: number;
   timestamp: number;
   provider: string;
+  isSampleData?: boolean;
   cached?: boolean;
   degraded?: boolean;
   error?: string;
+  warning?: string;
 }
 
 export async function GET(request: NextRequest) {
@@ -43,6 +44,7 @@ export async function GET(request: NextRequest) {
         error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
         timestamp: Date.now(),
         aircraft: [],
+        states: [],
         totalFound: 0,
       },
       {
@@ -56,8 +58,8 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const providerParam = searchParams.get('provider'); // 'airplanes.live' | 'adsb-open' | 'auto'
-  const boundsParam = searchParams.get('bounds'); // 'south,west,north,east'
+  const providerParam = searchParams.get('provider');
+  const boundsParam = searchParams.get('bounds');
   const zoomParam = searchParams.get('zoom');
   const zoom = zoomParam ? parseFloat(zoomParam) : 10;
 
@@ -80,6 +82,7 @@ export async function GET(request: NextRequest) {
           error: 'Invalid bounds parameter. Format must be south,west,north,east in decimal degrees.',
           timestamp: Date.now(),
           aircraft: [],
+          states: [],
           totalFound: 0,
         },
         { status: 400 }
@@ -107,6 +110,7 @@ export async function GET(request: NextRequest) {
           error: validation.error,
           timestamp: Date.now(),
           aircraft: [],
+          states: [],
           totalFound: 0,
           provider: 'aeroloom-validator',
         },
@@ -125,6 +129,31 @@ export async function GET(request: NextRequest) {
       east: Math.min(180, lon + lonDelta),
       zoom,
     };
+  }
+
+  // Check DEV_SAMPLE_TRAFFIC mode
+  const isDevSampleTraffic =
+    process.env.DEV_SAMPLE_TRAFFIC === '1' && process.env.NODE_ENV !== 'production';
+
+  if (isDevSampleTraffic || providerParam === 'sample') {
+    const sampleProvider = new SampleTrafficProvider();
+    const states = await sampleProvider.getAircraftInBounds(bounds);
+    const reqTime = Date.now();
+    const legacyAircraft = states.map((s) => ({
+      ...toAircraftPosition(s),
+      lat: s.lat,
+      lon: s.lon,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      states,
+      aircraft: legacyAircraft,
+      totalFound: states.length,
+      timestamp: reqTime,
+      provider: 'sample-dev-traffic',
+      isSampleData: true,
+    });
   }
 
   // 2. Quantize bounds for shared cache keys among nearby users
@@ -152,14 +181,18 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // 4. Request Coalescing: concurrent identical requests join the same in-flight Promise
+  // 4. Request Coalescing
   try {
     const payload = await globalCoalescer.execute<CachedPayload>(cacheKey, async () => {
       let provider: FlightProvider;
       if (providerParam === 'airplanes.live') {
         provider = new AirplanesLiveProvider();
+      } else if (providerParam === 'adsb.fi') {
+        provider = new AdsbFiProvider();
       } else if (providerParam === 'adsb-open' || providerParam === 'adsb.lol') {
         provider = new AdsbLolProvider();
+      } else if (providerParam === 'opensky' || providerParam === 'opensky-network') {
+        provider = new OpenSkyProvider();
       } else {
         provider = getDefaultFlightProvider();
       }
@@ -173,8 +206,12 @@ export async function GET(request: NextRequest) {
         ageSeconds: Math.max(0, Math.round((reqTime - s.updatedAt) / 1000)),
       }));
 
-      // Backward compatible aircraft list
-      const legacyAircraft = enrichedStates.map(toAircraftPosition);
+      // Backward compatible aircraft list with both lat/lon and latitude/longitude
+      const legacyAircraft = enrichedStates.map((s) => ({
+        ...toAircraftPosition(s),
+        lat: s.lat,
+        lon: s.lon,
+      }));
 
       const result: CachedPayload = {
         success: true,
@@ -183,6 +220,7 @@ export async function GET(request: NextRequest) {
         totalFound: enrichedStates.length,
         timestamp: reqTime,
         provider: provider.name,
+        isSampleData: false,
       };
 
       await cache.set(cacheKey, result, POSITIVE_CACHE_TTL_SEC);
@@ -199,7 +237,7 @@ export async function GET(request: NextRequest) {
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Upstream provider failure';
 
-    // 5. Honest degraded fallback: if we have any stale cached data for this key, return it with degraded: true
+    // 5. Stale cached fallback: if we have any stale cached data for this key, return it with degraded: true
     if (cachedData) {
       return NextResponse.json(
         {

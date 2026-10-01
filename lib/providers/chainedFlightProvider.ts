@@ -1,83 +1,152 @@
 import type { AircraftState, Bounds, FlightProvider, TrackPoint } from './types.ts';
-import { AirplanesLiveProvider } from './airplanesLiveProvider.ts';
+import { AdsbFiProvider } from './adsbFiProvider.ts';
 import { AdsbLolProvider } from './adsbLolProvider.ts';
+import { AirplanesLiveProvider } from './airplanesLiveProvider.ts';
+import { OpenSkyProvider } from './openSkyProvider.ts';
+import { shouldSkipProvider } from './healthTracker.ts';
 
 export class ChainedFlightProvider implements FlightProvider {
   readonly name = 'chained-failover';
-  private primary: FlightProvider;
-  private secondary: FlightProvider;
-  private lastSuccessfulProvider: string = 'none';
+  private providers: FlightProvider[];
+  private lastSuccessfulProviderName: string = 'none';
 
   constructor(
-    primary: FlightProvider = new AirplanesLiveProvider(),
-    secondary: FlightProvider = new AdsbLolProvider()
+    providersOrPrimary?: FlightProvider[] | FlightProvider,
+    secondary?: FlightProvider
   ) {
-    this.primary = primary;
-    this.secondary = secondary;
+    if (Array.isArray(providersOrPrimary)) {
+      this.providers = providersOrPrimary;
+    } else if (providersOrPrimary) {
+      this.providers = [providersOrPrimary, ...(secondary ? [secondary] : [])];
+    } else {
+      this.providers = [
+        new AdsbFiProvider(),
+        new AdsbLolProvider(),
+        new AirplanesLiveProvider(),
+        new OpenSkyProvider(),
+      ];
+    }
   }
 
   get lastProvider(): string {
-    return this.lastSuccessfulProvider;
+    return this.lastSuccessfulProviderName;
+  }
+
+  get configuredProviders(): FlightProvider[] {
+    return [...this.providers];
+  }
+
+  private deduplicate(aircraft: AircraftState[]): AircraftState[] {
+    const map = new Map<string, AircraftState>();
+    for (const a of aircraft) {
+      if (a.id && !map.has(a.id)) {
+        map.set(a.id, a);
+      }
+    }
+    return Array.from(map.values());
+  }
+
+  /**
+   * For very large viewports (e.g. world zoom <= 4 or span > 90 deg),
+   * tiles the query across major high-density airspace sectors to ensure aircraft are visible globally.
+   */
+  private getTiledSubBounds(bounds: Bounds): Bounds[] {
+    const latSpan = Math.abs(bounds.north - bounds.south);
+    const lonSpan = Math.abs(bounds.east - bounds.west);
+
+    if ((bounds.zoom !== undefined && bounds.zoom <= 4) || latSpan > 60 || lonSpan > 90) {
+      // Global/continental view: sample 3 prominent high-density traffic sectors
+      return [
+        { south: 35.0, north: 45.0, west: -82.0, east: -70.0, zoom: 6 }, // US East / NY
+        { south: 48.0, north: 55.0, west: -5.0, east: 12.0, zoom: 6 },   // Western Europe / London / Paris
+        { south: 30.0, north: 40.0, west: 130.0, east: 145.0, zoom: 6 }, // East Asia / Tokyo
+      ];
+    }
+
+    return [bounds];
   }
 
   async getAircraftInBounds(bounds: Bounds): Promise<AircraftState[]> {
-    try {
-      const data = await this.primary.getAircraftInBounds(bounds);
-      if (data && data.length > 0) {
-        this.lastSuccessfulProvider = this.primary.name;
-        return data;
+    const subBoundsList = this.getTiledSubBounds(bounds);
+    const errors: string[] = [];
+
+    for (const provider of this.providers) {
+      if (shouldSkipProvider(provider.name)) {
+        continue;
       }
-    } catch {
-      // Primary failed; proceed to secondary
+
+      try {
+        if (subBoundsList.length === 1) {
+          const data = await provider.getAircraftInBounds(subBoundsList[0]);
+          this.lastSuccessfulProviderName = provider.name;
+          return data;
+        }
+
+        // Tiled multi-sector query for world views
+        const results = await Promise.allSettled(
+          subBoundsList.map((sub) => provider.getAircraftInBounds(sub))
+        );
+        const combined: AircraftState[] = [];
+        let anySuccess = false;
+
+        for (const res of results) {
+          if (res.status === 'fulfilled') {
+            anySuccess = true;
+            combined.push(...res.value);
+          }
+        }
+
+        if (anySuccess) {
+          this.lastSuccessfulProviderName = provider.name;
+          return this.deduplicate(combined);
+        }
+
+        throw new Error(`${provider.name} failed across all tiled sectors`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        errors.push(`${provider.name}: ${msg}`);
+      }
     }
 
-    try {
-      const data = await this.secondary.getAircraftInBounds(bounds);
-      this.lastSuccessfulProvider = this.secondary.name;
-      return data;
-    } catch (err) {
-      this.lastSuccessfulProvider = 'all-failed';
-      throw err;
-    }
+    this.lastSuccessfulProviderName = 'all-failed';
+    throw new Error(`All telemetry providers failed: ${errors.join('; ')}`);
   }
 
   async getAircraftByCallsign(callsignOrHex: string): Promise<AircraftState | null> {
-    try {
-      const data = await this.primary.getAircraftByCallsign(callsignOrHex);
-      if (data) {
-        this.lastSuccessfulProvider = this.primary.name;
-        return data;
+    for (const provider of this.providers) {
+      if (shouldSkipProvider(provider.name)) {
+        continue;
       }
-    } catch {
-      // Failover to secondary
-    }
 
-    try {
-      const data = await this.secondary.getAircraftByCallsign(callsignOrHex);
-      if (data) {
-        this.lastSuccessfulProvider = this.secondary.name;
+      try {
+        const data = await provider.getAircraftByCallsign(callsignOrHex);
+        if (data) {
+          this.lastSuccessfulProviderName = provider.name;
+          return data;
+        }
+      } catch {
+        // Failover to next provider
       }
-      return data;
-    } catch {
-      return null;
     }
+    return null;
   }
 
   async getTrack(id: string): Promise<TrackPoint[]> {
-    try {
-      const track = await this.primary.getTrack(id);
-      if (track && track.length > 0) {
-        return track;
+    for (const provider of this.providers) {
+      if (shouldSkipProvider(provider.name)) {
+        continue;
       }
-    } catch {
-      // Try secondary
-    }
 
-    try {
-      return await this.secondary.getTrack(id);
-    } catch {
-      return [];
+      try {
+        const track = await provider.getTrack(id);
+        if (track && track.length > 0) {
+          return track;
+        }
+      } catch {
+        // Failover to next provider
+      }
     }
+    return [];
   }
 }
 
@@ -85,10 +154,7 @@ let defaultProviderInstance: FlightProvider | null = null;
 
 export function getDefaultFlightProvider(): FlightProvider {
   if (!defaultProviderInstance) {
-    defaultProviderInstance = new ChainedFlightProvider(
-      new AirplanesLiveProvider(),
-      new AdsbLolProvider()
-    );
+    defaultProviderInstance = new ChainedFlightProvider();
   }
   return defaultProviderInstance;
 }

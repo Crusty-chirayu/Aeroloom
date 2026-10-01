@@ -1,135 +1,96 @@
-'use client';
-
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { AircraftState, Bounds } from '@/lib/providers/types';
 import type { PositionSample } from '@/lib/providers/positions/types';
-import type { AviationSector } from '@/lib/map/config';
 import { AircraftInterpolator } from '@/lib/map/interpolation';
 
-export interface UseLiveAircraftOptions {
-  sector?: AviationSector;
-  bounds?: Bounds;
+export interface SectorDefinition {
+  id: string;
+  name: string;
+  center: [number, number]; // [lng, lat]
+  defaultZoom: number;
+}
+
+interface UseLiveAircraftOptions {
+  sector?: SectorDefinition;
   zoom?: number;
   pollIntervalMs?: number;
   enabled?: boolean;
 }
 
-export interface UseLiveAircraftReturn {
-  aircraft: AircraftState[];
-  totalCount: number;
-  isLoading: boolean;
-  isRefreshing: boolean;
-  isStale: boolean;
-  isDegraded: boolean;
-  lastUpdated: Date | null;
-  error: string | null;
-  selectedAircraft: AircraftState | null;
-  selectedAircraftId: string | null;
-  isFollowMode: boolean;
-  selectedAircraftTrail: PositionSample[];
-  interpolator: AircraftInterpolator;
-  // Controls
-  setSelectedAircraftId: (id: string | null) => void;
-  setIsFollowMode: (follow: boolean) => void;
-  setBounds: (bounds: Bounds, zoom: number) => void;
-  refresh: () => void;
-  // Replay compatibility
-  isReplayActive: boolean;
-  isReplayPlaying: boolean;
-  replayIndex: number;
-  replaySpeed: number;
-  startReplay: () => void;
-  pauseReplay: () => void;
-  toggleReplayPlay: () => void;
-  seekReplay: (index: number) => void;
-  setReplaySpeed: (multiplier: number) => void;
-  stopReplay: () => void;
-}
-
-const MAX_TRAIL_SAMPLES = 60;
-const DEBOUNCE_DELAY_MS = 250; // 250ms debounce per spec
+const MAX_TRAIL_SAMPLES = 50;
+const DEBOUNCE_DELAY_MS = 250;
 
 export function useLiveAircraft({
   sector,
-  bounds: initialBounds,
-  zoom: initialZoom = 9,
+  zoom = 10,
   pollIntervalMs = 6000,
   enabled = true,
-}: UseLiveAircraftOptions = {}): UseLiveAircraftReturn {
+}: UseLiveAircraftOptions = {}) {
   const [aircraft, setAircraft] = useState<AircraftState[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isStale, setIsStale] = useState<boolean>(false);
   const [isDegraded, setIsDegraded] = useState<boolean>(false);
+  const [isSampleData, setIsSampleData] = useState<boolean>(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [selectedAircraftId, setSelectedAircraftIdState] = useState<string | null>(null);
+  const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const [selectedAircraft, setSelectedAircraft] = useState<AircraftState | null>(null);
-  const [isFollowMode, setIsFollowMode] = useState<boolean>(false);
   const [selectedTrail, setSelectedTrail] = useState<PositionSample[]>([]);
+  const [isFollowMode, setIsFollowMode] = useState<boolean>(false);
 
-  // Viewport bounds state
-  const [activeBounds, setActiveBounds] = useState<Bounds | null>(initialBounds || null);
-  const [activeZoom, setActiveZoom] = useState<number>(initialZoom);
+  // Dynamic bounds tracking
+  const [activeBounds, setActiveBounds] = useState<Bounds | null>(null);
+  const [activeZoom, setActiveZoom] = useState<number>(zoom);
 
-  // Single persistent interpolator instance
-  const [interpolator] = useState(() => new AircraftInterpolator());
-  // Breadcrumb history buffer: hex -> PositionSample[]
-  const breadcrumbsMapRef = useRef<Map<string, PositionSample[]>>(new Map());
-
-  // Replay state machine (compatibility)
+  // Replay states (backward compatibility)
   const [isReplayActive, setIsReplayActive] = useState<boolean>(false);
   const [isReplayPlaying, setIsReplayPlaying] = useState<boolean>(false);
   const [replayIndex, setReplayIndex] = useState<number>(0);
   const [replaySpeed, setReplaySpeed] = useState<number>(1);
 
+  // References
+  const isMountedRef = useRef<boolean>(true);
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isMountedRef = useRef<boolean>(true);
+  const retryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const consecutiveFailuresRef = useRef<number>(0);
+  // Instantiate persistent MapLibre 60FPS dead-reckoning interpolator
+  const interpolator = useMemo(() => new AircraftInterpolator(), []);
+  const fetchAircraftRef = useRef<() => Promise<void>>(async () => {});
 
-  // Safe setter for selected aircraft ID
-  const setSelectedAircraftId = useCallback((id: string | null) => {
-    setSelectedAircraftIdState(id);
-    interpolator.setSelectedId(id);
+  // Update selected aircraft reference when ID changes
+  useEffect(() => {
+    interpolator.setSelectedId(selectedAircraftId);
 
-    if (!id) {
-      setSelectedAircraft(null);
-      setIsFollowMode(false);
-      setSelectedTrail([]);
-      setIsReplayActive(false);
-      setIsReplayPlaying(false);
-    } else {
-      const existing = interpolator.get(id);
-      if (existing) {
-        setSelectedAircraft(existing.raw);
+    queueMicrotask(() => {
+      if (!isMountedRef.current) return;
+      if (!selectedAircraftId) {
+        setSelectedAircraft(null);
+        setSelectedTrail([]);
+        setIsFollowMode(false);
       } else {
-        setSelectedAircraft({
-          id,
-          callsign: id.toUpperCase(),
-          lat: 40.64,
-          lon: -73.78,
-          altitudeFt: 36000,
-          groundSpeedKt: 472,
-          trackDeg: 78,
-          verticalRateFpm: 0,
-          squawk: '2411',
-          onGround: false,
-          source: 'airplanes.live',
-          updatedAt: Date.now(),
-        });
+        const live = interpolator.get(selectedAircraftId);
+        if (live) {
+          setSelectedAircraft(live.raw);
+        } else {
+          const found = aircraft.find((a) => a.id === selectedAircraftId);
+          if (found) {
+            setSelectedAircraft(found);
+          }
+        }
+        const trail = breadcrumbsMapRef.current.get(selectedAircraftId) || [];
+        setSelectedTrail([...trail]);
       }
-      const trail = breadcrumbsMapRef.current.get(id) || [];
-      setSelectedTrail([...trail]);
-    }
-  }, [interpolator]);
+    });
+  }, [selectedAircraftId, interpolator, aircraft]);
 
   // Set bounds callback with debounce
-  const setBounds = useCallback((bounds: Bounds, zoom: number) => {
+  const setBounds = useCallback((bounds: Bounds, currentZoom: number) => {
     setActiveBounds(bounds);
-    setActiveZoom(zoom);
+    setActiveZoom(currentZoom);
   }, []);
 
   // Fetch live aircraft data from server route
@@ -163,13 +124,20 @@ export function useLiveAircraft({
       });
 
       if (!res.ok) {
-        throw new Error(`Airspace telemetry query failed with HTTP status ${res.status}`);
+        throw new Error(`HTTP ${res.status}`);
       }
 
       const envelope = await res.json();
       if (!isMountedRef.current) return;
 
-      const receivedList: AircraftState[] = envelope.aircraft || [];
+      // Extract and normalize aircraft list to guarantee lat and lon
+      const rawList = (envelope.states || envelope.aircraft || []) as (AircraftState & { latitude?: number; longitude?: number })[];
+      const receivedList: AircraftState[] = rawList.map((ac) => ({
+        ...ac,
+        lat: typeof ac.lat === 'number' ? ac.lat : (typeof ac.latitude === 'number' ? ac.latitude : 0),
+        lon: typeof ac.lon === 'number' ? ac.lon : (typeof ac.longitude === 'number' ? ac.longitude : 0),
+      })).filter((ac) => ac.lat !== 0 || ac.lon !== 0);
+
       const now = new Date();
 
       // Feed into interpolation engine
@@ -194,11 +162,13 @@ export function useLiveAircraft({
       });
 
       // Update state
+      consecutiveFailuresRef.current = 0;
       setAircraft(receivedList);
       setTotalCount(envelope.totalFound || receivedList.length);
       setLastUpdated(now);
       setIsStale(false);
       setIsDegraded(Boolean(envelope.degraded));
+      setIsSampleData(Boolean(envelope.isSampleData));
       setError(null);
       setIsLoading(false);
       setIsRefreshing(false);
@@ -216,13 +186,29 @@ export function useLiveAircraft({
       if ((err as Error)?.name === 'AbortError') return;
       if (!isMountedRef.current) return;
 
-      console.warn('Live aircraft fetch notice:', (err as Error)?.message);
+      consecutiveFailuresRef.current += 1;
       setIsStale(true);
       setIsRefreshing(false);
       setIsLoading(false);
-      setError((err as Error)?.message || 'Temporary telemetry degradation');
+      setIsDegraded(true);
+
+      // Friendly UI message, never raw HTTP dumps
+      setError('No live data source is reachable right now. Retrying…');
+
+      // Automatic backoff retry (5s, 10s, max 30s)
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      const backoffMs = Math.min(5000 * Math.pow(1.5, consecutiveFailuresRef.current - 1), 30000);
+      retryTimerRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          fetchAircraftRef.current();
+        }
+      }, backoffMs);
     }
   }, [enabled, activeBounds, activeZoom, sector, selectedAircraftId, interpolator]);
+
+  useEffect(() => {
+    fetchAircraftRef.current = fetchAircraft;
+  }, [fetchAircraft]);
 
   // Handle bounds or sector changes with debounce
   useEffect(() => {
@@ -250,6 +236,7 @@ export function useLiveAircraft({
     return () => {
       isMountedRef.current = false;
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
   }, [fetchAircraft, pollIntervalMs]);
@@ -290,6 +277,7 @@ export function useLiveAircraft({
     isRefreshing,
     isStale,
     isDegraded,
+    isSampleData,
     lastUpdated,
     error,
     selectedAircraft,
