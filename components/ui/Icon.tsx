@@ -27,8 +27,8 @@ import {
   Settings, Sliders, Star, Bookmark, Download, Upload, Share2,
   // User
   User, LogIn, LogOut,
-  // Environment / Weather
-  Moon, Flag,
+  // Environment / Weather / Media
+  Moon, Flag, Play, Pause,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -93,6 +93,8 @@ export const LUCIDE_ICONS = {
   logout: LogOut,
   moon: Moon,
   flag: Flag,
+  play: Play,
+  pause: Pause,
   radar: Radio,
   check: CheckCircle2,
   x: X,

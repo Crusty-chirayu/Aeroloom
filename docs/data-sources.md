@@ -60,16 +60,23 @@ This document registers every third-party data provider, telemetry stream, and t
 
 ---
 
-## 5. Precipitation Radar (Optional Layer): RainViewer
+## 5. Precipitation Weather Radar: RainViewer Weather Maps API
 
 | Property | Detail |
 |---|---|
-| **Primary URL** | `https://api.rainviewer.com/public/weather-maps.json` |
-| **Function in Aeroloom** | Weather radar reflectivity overlay for convective storm tracking. |
-| **Rate Limits** | Public free tier for non-commercial web apps. |
-| **Terms & Licensing** | Free API tier requires clear, unmodified branding and link back to RainViewer. |
-| **Commercial Use** | Commercial plans require RainViewer API subscription. |
-| **Required Attribution** | "Radar imagery © RainViewer." |
+| **Primary Index URL** | `https://api.rainviewer.com/public/weather-maps.json` |
+| **Tile Host** | `https://tilecache.rainviewer.com` (global CDN) |
+| **Active Tile Pattern** | `{host}{path}/{size}/{z}/{x}/{y}/{color}/{smooth}_{snow}.png` |
+| **Function in Aeroloom** | Live weather radar reflectivity overlay, multi-frame Doppler precipitation timeline, and convective cell monitoring. |
+| **Verified Zoom Levels** | **Zoom 0 to 7**. Radar tiles are capped at zoom level 7 per official RainViewer specifications. Above z7, MapLibre overscales z7 raster tiles cleanly. |
+| **Tile Sizes** | 256px or 512px. Aeroloom uses 256px standard raster tiles. |
+| **Frame Counts & Interval** | **13 past radar frames** spanning the previous 2 hours in **10-minute intervals**. Nowcast frames (`nowcast: []`) are empty on the public free tier. |
+| **Color Schemes** | Schemes 0–8. Aeroloom employs Scheme `2` ("Universal Blue") or Scheme `4` ("TWC") with `{smooth=1}_{snow=1}` for high-contrast legibility on light paper cartography (`#F6F4EE`). |
+| **Rate Limits** | Fair-use public tier. API index must be cached on server (5-minute TTL). Client tile requests are served directly from `tilecache.rainviewer.com`. |
+| **Server Mitigation** | Aeroloom caches `/api/radar` for 300s (5 minutes) in Redis/Memory and enforces a 120 req/min per-IP rate limit. |
+| **Terms & Licensing** | © RainViewer / MeteoLab Inc. Free for non-commercial, personal, and research applications. Commercial deployment strictly requires an active RainViewer API subscription. |
+| **Commercial Use** | **Restricted**: Requires paid subscription from MeteoLab Inc. for commercial distribution. |
+| **Required Attribution** | "Radar imagery © [RainViewer](https://www.rainviewer.com/api/weather-maps-api.html)." Tastefully integrated on map layer controls and `/about/data`. |
 
 ---
 

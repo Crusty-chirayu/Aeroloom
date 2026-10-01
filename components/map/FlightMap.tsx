@@ -24,6 +24,8 @@ export interface FlightMapProps {
   initialZoom?: number;
   filters: MapFilters;
   layers: MapLayers;
+  radarTileUrl?: string | null;
+  radarOpacity?: number;
   className?: string;
 }
 
@@ -39,6 +41,8 @@ export function FlightMap({
   initialZoom = 8,
   filters,
   layers,
+  radarTileUrl = null,
+  radarOpacity = 0.7,
   className = '',
 }: FlightMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -313,7 +317,7 @@ export function FlightMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
-  // 2. Layer visibility synchronization
+  // 2. Layer visibility synchronization & dynamic radar source
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isMapLoadedRef.current) return;
@@ -321,10 +325,61 @@ export function FlightMap({
     if (map.getLayer('terminator-fill')) {
       map.setLayoutProperty('terminator-fill', 'visibility', layers.terminator ? 'visible' : 'none');
     }
-    if (map.getLayer('radar-raster')) {
-      map.setLayoutProperty('radar-raster', 'visibility', layers.radar ? 'visible' : 'none');
+
+    if (!layers.radar || !radarTileUrl) {
+      if (map.getLayer('radar-raster')) {
+        map.setLayoutProperty('radar-raster', 'visibility', 'none');
+      }
+      return;
     }
-  }, [layers]);
+
+    try {
+      const source = map.getSource('rainviewer-radar') as unknown as { setTiles: (tiles: string[]) => void } | undefined;
+      if (source && typeof source.setTiles === 'function') {
+        source.setTiles([radarTileUrl]);
+        if (map.getLayer('radar-raster')) {
+          map.setLayoutProperty('radar-raster', 'visibility', 'visible');
+          map.setPaintProperty('radar-raster', 'raster-opacity', radarOpacity);
+        }
+      } else {
+        if (map.getLayer('radar-raster')) {
+          map.removeLayer('radar-raster');
+        }
+        if (map.getSource('rainviewer-radar')) {
+          map.removeSource('rainviewer-radar');
+        }
+
+        map.addSource('rainviewer-radar', {
+          type: 'raster',
+          tiles: [radarTileUrl],
+          tileSize: 256,
+          maxzoom: 7,
+        });
+
+        const beforeLayerId = map.getLayer('aeroloom-aircraft-shadows')
+          ? 'aeroloom-aircraft-shadows'
+          : undefined;
+
+        map.addLayer(
+          {
+            id: 'radar-raster',
+            type: 'raster',
+            source: 'rainviewer-radar',
+            layout: {
+              visibility: 'visible',
+            },
+            paint: {
+              'raster-opacity': radarOpacity,
+              'raster-fade-duration': 0,
+            },
+          },
+          beforeLayerId
+        );
+      }
+    } catch (err) {
+      console.warn('Radar layer update notice:', err);
+    }
+  }, [layers.terminator, layers.radar, radarTileUrl, radarOpacity]);
 
   // 3. Update Selected Trail Line GeoJSON
   useEffect(() => {

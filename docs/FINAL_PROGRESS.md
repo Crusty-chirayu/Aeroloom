@@ -9,7 +9,7 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 | Part | Description | Status | Verification Gate |
 | :--- | :--- | :--- | :--- |
 | **Part A** | Close production-readiness gaps (config, 404 /dev/*, Firefox/WebKit report, fresh install, URLs) | **DONE** | `npm ci`, `build`, `test`, `dev/kit` 404 proof, Lighthouse mobile baseline |
-| **Part B** | Live weather radar on map (RainViewer API terms, frame cache, timeline, 60fps pan/zoom) | **IN PROGRESS** | Terms in `data-sources.md`, frame cache, radar timeline, frame rate benchmarks |
+| **Part B** | Live weather radar on map (RainViewer API terms, frame cache, timeline, 60fps pan/zoom) | **DONE** | Terms in `data-sources.md`, frame cache, radar timeline, frame rate benchmarks |
 | **Part C** | ATC-style radar scope on airport pages (range rings, live blips, rotating sweep, table fallback) | PENDING | 60fps with 300 blips, reduced motion, bento tile preview, accessible table |
 | **Part D** | Backend hardening (all API routes audited, failure simulation, rate limits, /status, CSP) | PENDING | Real requests audit, simulated upstream outages, 429 Retry-After, security headers |
 | **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | PENDING | Unit & e2e tests, RLS cross-user isolation, `docs/AUTH_SETUP.md` |
@@ -37,6 +37,24 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 
 ---
 
-## 3. Evidence & Audit Records
+## 3. Part B: Execution Log
 
-*(Audit outputs and logs will be appended as each step executes)*
+### Tasks
+- [x] Verify and document RainViewer API terms in `docs/data-sources.md` (native z0–z7, 13 past 10-min Doppler frames, scheme 2, attribution).
+- [x] Build server proxy endpoint `/api/radar/route.ts` with 5-min server cache TTL, request coalescing, per-IP rate limiting, and stale fallback.
+- [x] Build radar timeline control `components/map/RadarTimelineControl.tsx` with play/pause, scrubber, UTC/local timestamps, opacity slider, reflectivity legend, keyboard navigation, and reduced motion support.
+- [x] Integrate Doppler radar raster layer into MapLibre `components/map/FlightMap.tsx` and sync `?radar=1` query parameter on `/map`.
+- [x] Optimize WebGL raster layer updates in-place via `(source as any).setTiles([radarTileUrl])` to eliminate texture re-allocation thrashing.
+- [x] Create and run Playwright FPS benchmark script `scripts/benchmark-radar-fps.mjs`.
+
+---
+
+## 4. Evidence & Audit Records
+
+### Part B FPS Benchmark Result (`scripts/benchmark-radar-fps.mjs`):
+- **Radar OFF:** 16.83 ms/frame (**59 FPS**)
+- **Radar ON:** 16.63 ms/frame (**60 FPS**)
+- **TypeScript:** 0 errors (`npx tsc --noEmit`)
+- **ESLint:** 0 warnings / 0 errors (`npm run lint`)
+- **Vitest:** 141/141 passing (`npm test`)
+

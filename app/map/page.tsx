@@ -6,6 +6,7 @@ import { useLiveAircraft } from '@/hooks/useLiveAircraft';
 import { FlightMap } from '@/components/map/FlightMap';
 import { FlightPanel } from '@/components/flight/FlightPanel';
 import { MapControls, type MapFilters, type MapLayers } from '@/components/map/MapControls';
+import { RadarTimelineControl } from '@/components/map/RadarTimelineControl';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 import { Button } from '@/components/ui/Button';
 import type { Bounds } from '@/lib/providers/types';
@@ -27,6 +28,7 @@ function MapViewContent() {
   const initialLng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : -73.78;
   const initialZoom = searchParams.get('z') ? parseFloat(searchParams.get('z')!) : 8;
   const initialFlight = searchParams.get('flight') || null;
+  const initialRadar = searchParams.get('radar') === '1';
 
   // Live Aircraft Telemetry Hook
   const {
@@ -59,10 +61,14 @@ function MapViewContent() {
   // UI Layers State
   const [layers, setLayers] = useState<MapLayers>({
     terminator: true,
-    radar: false,
+    radar: initialRadar,
     airports: true,
     labels: 'normal',
   });
+
+  // Radar Timeline State
+  const [radarTileUrl, setRadarTileUrl] = useState<string | null>(null);
+  const [radarOpacity, setRadarOpacity] = useState<number>(0.7);
 
   // Command palette search state
   const [searchOpen, setSearchOpen] = useState(false);
@@ -92,10 +98,15 @@ function MapViewContent() {
         } else {
           url.searchParams.delete('flight');
         }
+        if (layers.radar) {
+          url.searchParams.set('radar', '1');
+        } else {
+          url.searchParams.delete('radar');
+        }
         window.history.replaceState({}, '', url.toString());
       }
     },
-    [setBounds, selectedAircraftId]
+    [setBounds, selectedAircraftId, layers.radar]
   );
 
   // Sector Switching
@@ -108,10 +119,11 @@ function MapViewContent() {
         url.searchParams.set('lat', target.center[1].toString());
         url.searchParams.set('lng', target.center[0].toString());
         url.searchParams.set('z', target.zoom.toString());
+        if (layers.radar) url.searchParams.set('radar', '1');
         window.location.href = url.toString();
       }
     },
-    []
+    [layers.radar]
   );
 
   // Global Keyboard Shortcuts
@@ -166,7 +178,19 @@ function MapViewContent() {
         initialZoom={initialZoom}
         filters={filters}
         layers={layers}
+        radarTileUrl={radarTileUrl}
+        radarOpacity={radarOpacity}
         className="w-full h-full"
+      />
+
+      {/* Radar Timeline & Frame Controls */}
+      <RadarTimelineControl
+        isVisible={layers.radar}
+        onToggleVisibility={() => setLayers((prev) => ({ ...prev, radar: false }))}
+        onFrameChange={(url, op) => {
+          setRadarTileUrl(url);
+          setRadarOpacity(op);
+        }}
       />
 
       {/* Primary Map Chrome Controls */}
