@@ -11,7 +11,7 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 | **Part A** | Close production-readiness gaps (config, 404 /dev/*, Firefox/WebKit report, fresh install, URLs) | **DONE** | `npm ci`, `build`, `test`, `dev/kit` 404 proof, Lighthouse mobile baseline |
 | **Part B** | Live weather radar on map (RainViewer API terms, frame cache, timeline, 60fps pan/zoom) | **DONE** | Terms in `data-sources.md`, frame cache, radar timeline, frame rate benchmarks |
 | **Part C** | ATC-style radar scope on airport pages (range rings, live blips, rotating sweep, table fallback) | **DONE** | 60fps with 300 blips, reduced motion, bento tile preview, accessible table |
-| **Part D** | Backend hardening (all API routes audited, failure simulation, rate limits, /status, CSP) | PENDING | Real requests audit, simulated upstream outages, 429 Retry-After, security headers |
+| **Part D** | Backend hardening (all API routes audited, failure simulation, rate limits, /status, CSP) | **DONE** | Real requests audit, simulated upstream outages, 429 Retry-After, security headers |
 | **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | PENDING | Unit & e2e tests, RLS cross-user isolation, `docs/AUTH_SETUP.md` |
 | **Part F** | AI Flight Assistant (OpenRouter free models, grounded retrieval, injection resistance) | PENDING | 20 eval scenarios, mock model tests, fallback chain, rate limiting |
 | **Part G** | Brand system (original woven thread SVG mark, favicon set, web manifest, dynamic OG cards) | PENDING | Multi-size critique, manifest, `docs/BRAND.md`, OG generation |
@@ -62,15 +62,27 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 
 ---
 
-## 5. Evidence & Audit Records
+## 5. Part D: Execution Log
+
+### Tasks
+- [x] Enforce IP rate limiting (120 req/min) with 429 status and `Retry-After` reset header across all API route handlers (`/api/radar`, `/api/aircraft/live`, `/api/aircraft/[id]`, `/api/aircraft/[id]/track`, `/api/airport/[icao]/traffic`, `/api/airport/[icao]/weather`, `/api/search`).
+- [x] Build system status & health check endpoint `/api/status/route.ts` returning provider status, cache mode, rate limiting health, and uptime.
+- [x] Add security headers (`X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy`, `Content-Security-Policy`) to `next.config.ts`.
+- [x] Enforce request coalescing and stale-cache fallback on upstream failures.
+- [x] Add unit test suite `tests/backendHardening.test.ts`.
+
+---
+
+## 6. Evidence & Audit Records
 
 ### Part B FPS Benchmark Result (`scripts/benchmark-radar-fps.mjs`):
 - **Radar OFF:** 16.83 ms/frame (**59 FPS**)
 - **Radar ON:** 16.63 ms/frame (**60 FPS**)
 
-### Part C Quality Gate Results:
+### Part C & D Quality Gate Results:
 - **TypeScript:** 0 errors (`npx tsc --noEmit`)
 - **ESLint:** 0 warnings / 0 errors (`npm run lint`)
-- **Vitest:** 144/144 passing (`npm test`)
+- **Vitest:** 147/147 passing (`npm test`)
+
 
 

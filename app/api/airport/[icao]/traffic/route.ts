@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAirportByIcao, getAirportByIata, calculateDistanceNm } from '@/lib/airports/airportData';
 import { getDefaultFlightProvider } from '@/lib/providers/chainedFlightProvider';
-import { getCacheService, globalCoalescer } from '@/lib/cache';
+import { getCacheService, globalCoalescer, globalRateLimiter } from '@/lib/cache';
 import type { AircraftState, Bounds } from '@/lib/providers/types';
 
 interface RouteContext {
@@ -10,7 +10,33 @@ interface RouteContext {
   }>;
 }
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
+  // IP Rate Limiting (120 req / minute per client)
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip') ||
+    '127.0.0.1';
+
+  const rateCheck = globalRateLimiter.check(clientIp, 120, 60000);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
+        aircraft: [],
+        totalFound: 0,
+        timestamp: Date.now(),
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil(rateCheck.resetMs / 1000).toString(),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
   const { icao } = await context.params;
   const cleanCode = (icao || '').trim().toUpperCase();
 
@@ -98,10 +124,10 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       {
         success: false,
         airport,
-        aircraft: [],
-        totalFound: 0,
-        error: errorMsg,
+        aircraft: cached?.aircraft || [],
+        totalFound: cached?.totalFound || 0,
         degraded: true,
+        error: errorMsg,
         timestamp: Date.now(),
       },
       { status: 200 }

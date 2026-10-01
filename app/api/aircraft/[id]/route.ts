@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDefaultFlightProvider } from '@/lib/providers/chainedFlightProvider';
-import { getCacheService, globalCoalescer } from '@/lib/cache';
+import { getCacheService, globalCoalescer, globalRateLimiter } from '@/lib/cache';
 import type { AircraftState } from '@/lib/providers/types';
 
 interface RouteContext {
@@ -10,9 +10,33 @@ interface RouteContext {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: RouteContext
 ) {
+  // IP Rate Limiting (120 req / minute per client)
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip') ||
+    '127.0.0.1';
+
+  const rateCheck = globalRateLimiter.check(clientIp, 120, 60000);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
+        timestamp: Date.now(),
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil(rateCheck.resetMs / 1000).toString(),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
   const { id } = await context.params;
   const cleanId = (id || '').trim().toUpperCase();
 

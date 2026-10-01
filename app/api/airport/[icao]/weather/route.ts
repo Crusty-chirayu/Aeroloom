@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCacheService, globalCoalescer } from '@/lib/cache';
+import { getCacheService, globalCoalescer, globalRateLimiter } from '@/lib/cache';
 import {
   normalizeAviationWeatherReport,
   parseRawMetarString,
@@ -15,7 +15,31 @@ interface RouteContext {
 
 const USER_AGENT = 'Aeroloom-FlightTracker/0.1.0 (weather@aeroloom.internal)';
 
-export async function GET(_request: NextRequest, context: RouteContext) {
+export async function GET(request: NextRequest, context: RouteContext) {
+  // IP Rate Limiting (120 req / minute per client)
+  const clientIp =
+    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
+    request.headers.get('x-real-ip') ||
+    '127.0.0.1';
+
+  const rateCheck = globalRateLimiter.check(clientIp, 120, 60000);
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
+        timestamp: Date.now(),
+      },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': Math.ceil(rateCheck.resetMs / 1000).toString(),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    );
+  }
+
   const { icao } = await context.params;
   const cleanIcao = (icao || '').trim().toUpperCase();
 
@@ -99,29 +123,37 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       return normalizeAviationWeatherReport(cleanIcao, records[0]);
     });
 
-    // Cache weather report for 60 seconds
+    // Cache valid METAR for 60 seconds
     await cache.set(cacheKey, report, 60);
 
     return NextResponse.json(
       {
         success: true,
         weather: report,
+        cached: false,
         timestamp: Date.now(),
       },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
-          'X-Data-Source': 'aviationweather.gov',
+          'X-Data-Source': 'noaa-aviationweather',
         },
       }
     );
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Weather service unavailable';
+    const errorMsg = err instanceof Error ? err.message : 'Weather provider temporarily unavailable';
     return NextResponse.json(
       {
         success: false,
-        icao: cleanIcao,
         error: errorMsg,
+        weather: cached || {
+          icao: cleanIcao,
+          rawMetar: `${cleanIcao} METAR DEGRADED`,
+          flightCategory: 'VFR',
+          wind: { directionDeg: 0, speedKt: 0 },
+          visibilitySm: 10,
+          summary: 'Weather service temporarily degraded.',
+        },
         degraded: true,
         timestamp: Date.now(),
       },

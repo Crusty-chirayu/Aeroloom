@@ -1,7 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // No GLSL loaders needed — Three.js / R3F removed in Phase 0 redesign
+  headers: async () => [
+    {
+      source: '/:path*',
+      headers: [
+        { key: 'X-Frame-Options', value: 'DENY' },
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'origin-when-cross-origin' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        {
+          key: 'Content-Security-Policy',
+          value:
+            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tilecache.rainviewer.com https://*.tile.openstreetmap.org https://images.unsplash.com; connect-src 'self' https://api.airplanes.live https://api.adsb.lol https://opensky-network.org https://api.rainviewer.com https://tilecache.rainviewer.com https://aviationweather.gov https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; frame-ancestors 'none';",
+        },
+      ],
+    },
+  ],
 };
 
 export default nextConfig;
