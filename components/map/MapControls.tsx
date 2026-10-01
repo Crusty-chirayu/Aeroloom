@@ -34,6 +34,7 @@ export interface MapControlsProps {
   isFollowMode: boolean;
   selectedCallsign?: string;
   onExitFollow: () => void;
+  onTriggerAssistant?: (query?: string) => void;
 }
 
 export function MapControls({
@@ -51,6 +52,7 @@ export function MapControls({
   isFollowMode,
   selectedCallsign,
   onExitFollow,
+  onTriggerAssistant,
 }: MapControlsProps) {
   const [showLayersMenu, setShowLayersMenu] = useState(false);
   const [showSectorsMenu, setShowSectorsMenu] = useState(false);
@@ -93,6 +95,15 @@ export function MapControls({
               aria-label="Search"
             >
               <Icon name="search" size={18} />
+            </button>
+
+            <button
+              onClick={() => onTriggerAssistant?.()}
+              className="w-10 h-10 rounded-sm text-[var(--signal)] hover:bg-[var(--signal-wash)] border border-transparent hover:border-[var(--signal)]/30 transition-colors flex items-center justify-center"
+              title="Ask Aeroloom Grounded AI"
+              aria-label="Ask Aeroloom"
+            >
+              <Icon name="radar" size={18} />
             </button>
 
             <Link
@@ -177,8 +188,18 @@ export function MapControls({
           )}
         </div>
 
-        {/* Right: Layers Menu + Sector Menu */}
+        {/* Right: Ask AI + Layers Menu + Sector Menu + Auth */}
         <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Ask AI Button */}
+          <button
+            onClick={() => onTriggerAssistant?.()}
+            className="bg-white/95 backdrop-blur-sm border border-[var(--signal)]/30 hover:border-[var(--signal)] px-2.5 py-1.5 rounded-sm shadow-sm flex items-center gap-1.5 text-xs font-mono text-[var(--signal-ink)] bg-[var(--signal-wash)] hover:bg-[var(--signal-wash)]/80 transition-colors"
+            title="Ask Aeroloom Grounded AI Flight Assistant"
+            aria-label="Ask Aeroloom Grounded AI"
+          >
+            <Icon name="radar" size={14} className="text-[var(--signal)]" />
+            <span className="hidden sm:inline font-semibold">Ask AI</span>
+          </button>
           {/* Sector Menu Trigger */}
           <div className="relative">
             <button

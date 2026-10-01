@@ -13,7 +13,7 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 | **Part C** | ATC-style radar scope on airport pages (range rings, live blips, rotating sweep, table fallback) | **DONE** | 60fps with 300 blips, reduced motion, bento tile preview, accessible table |
 | **Part D** | Backend hardening (all API routes audited, failure simulation, rate limits, /status, CSP) | **DONE** | Real requests audit, simulated upstream outages, 429 Retry-After, security headers |
 | **Part E** | Accounts: Google/GitHub OAuth, guest mode, watchlist, import dialog, RLS migration | **DONE** | 153/153 tests pass, RLS schema in `AUTH_SETUP.md`, offline JSON import/export, AuthUserMenu |
-| **Part F** | AI Flight Assistant (OpenRouter free models, grounded retrieval, injection resistance) | PENDING | 20 eval scenarios, mock model tests, fallback chain, rate limiting |
+| **Part F** | AI Flight Assistant (OpenRouter free models, grounded retrieval, injection resistance) | **DONE** | 185/185 tests pass, 20 eval scenarios, mock model tests, fallback chain, rate limiting, UI |
 | **Part G** | Brand system (original woven thread SVG mark, favicon set, web manifest, dynamic OG cards) | PENDING | Multi-size critique, manifest, `docs/BRAND.md`, OG generation |
 | **Part H** | Legal, footer, developer mark, Case-study About page, feedback contact form | PENDING | `site-config.ts`, `check:launch`, clean legal pages, shared SiteFooter |
 | **Part I** | Tests & quality gates (Playwright e2e, axe-core 0 issues, 50/50 overflow, Lighthouse, secrets) | PENDING | E2E suite, 0 overflow, 0 a11y issues, secrets scan, bundle audit |
@@ -84,16 +84,33 @@ Tracking execution across Parts A through J on branch `redesign/v2`.
 
 ---
 
-## 7. Evidence & Audit Records
+## 7. Part F: Execution Log
+
+### Tasks
+- [x] Document OpenRouter free inference tier terms, rate limits, model routing, and streaming SSE protocols in `docs/data-sources.md`.
+- [x] Build typed server-side retrieval tools (`getFlight`, `searchFlights`, `getAirportWeather`, `getAirportTraffic`, `getSelectedFlightContext`) in `lib/assistant/tools.ts`.
+- [x] Implement prompt injection resistance and input sanitization (control character stripping, tag neutralization, XML escaping) in `lib/assistant/grounding.ts`.
+- [x] Construct immutable grounding system prompt with zero hallucination constraints, UTC time stamping, and safety disclaimers in `lib/assistant/systemPrompt.ts`.
+- [x] Build OpenRouter client with 4-model fallback chain (`ASSISTANT_MODELS`), 20s timeouts, and busy degradation in `lib/assistant/openRouterClient.ts`.
+- [x] Implement Server-Sent Events streaming route `POST /api/assistant` with strict 20 req/min IP rate limiting in `app/api/assistant/route.ts`.
+- [x] Build docked assistant modal dialog `components/assistant/AskAeroloomPanel.tsx` with contextual prompts, streaming text, sources disclosure, and copy button.
+- [x] Integrate Ask Aeroloom trigger into Command Palette (`components/ui/CommandPalette.tsx`), Map Controls (`components/map/MapControls.tsx`), and Airport header (`app/airport/[code]/page.tsx`).
+- [x] Author 20 evaluation scenarios (`tests/evalScenarios.ts`) and test suite (`tests/assistant.test.ts`) covering telemetry, METAR, traffic, missing data, safety refusal, prompt injection, and fallback cascading.
+- [x] Provide manual smoke test CLI script `scripts/test-assistant.mjs`.
+
+---
+
+## 8. Evidence & Audit Records
 
 ### Part B FPS Benchmark Result (`scripts/benchmark-radar-fps.mjs`):
 - **Radar OFF:** 16.83 ms/frame (**59 FPS**)
 - **Radar ON:** 16.63 ms/frame (**60 FPS**)
 
-### Quality Gate Results (Parts A–E):
+### Quality Gate Results (Parts A–F):
 - **TypeScript:** 0 errors (`npx tsc --noEmit`)
 - **ESLint:** 0 warnings / 0 errors (`npm run lint`)
-- **Tests:** 153/153 passing (`npm test`)
+- **Tests:** 185/185 passing (`npm test`)
+
 
 
 

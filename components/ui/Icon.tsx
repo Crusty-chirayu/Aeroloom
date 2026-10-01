@@ -24,7 +24,7 @@ import {
   Plane, PlaneTakeoff, PlaneLanding, Navigation, Compass, Globe, Map, MapPin, Radio,
   // Data / Interface
   Activity, BarChart2, Clock, Eye, Filter, Layers, RefreshCw,
-  Settings, Sliders, Star, Bookmark, Download, Upload, Share2, Tag, Table,
+  Settings, Sliders, Star, Bookmark, Download, Upload, Share2, Tag, Table, Copy,
   // User
   User, LogIn, LogOut,
   // Environment / Weather / Media
@@ -97,6 +97,7 @@ export const LUCIDE_ICONS = {
   pause: Pause,
   radar: Radio,
   check: CheckCircle2,
+  copy: Copy,
   x: X,
   'external-link': ArrowUpRight,
   'shield-check': CheckCircle2,

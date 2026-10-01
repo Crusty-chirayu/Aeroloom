@@ -8,6 +8,7 @@ import { FlightPanel } from '@/components/flight/FlightPanel';
 import { MapControls, type MapFilters, type MapLayers } from '@/components/map/MapControls';
 import { RadarTimelineControl } from '@/components/map/RadarTimelineControl';
 import { CommandPalette } from '@/components/ui/CommandPalette';
+import { AskAeroloomPanel } from '@/components/assistant/AskAeroloomPanel';
 import { Button } from '@/components/ui/Button';
 import type { Bounds } from '@/lib/providers/types';
 
@@ -72,6 +73,10 @@ function MapViewContent() {
 
   // Command palette search state
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // Ask Aeroloom AI Assistant state
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [assistantQuery, setAssistantQuery] = useState('');
 
   // Apply initial flight selection from URL query if present
   useEffect(() => {
@@ -214,6 +219,10 @@ function MapViewContent() {
         isFollowMode={isFollowMode}
         selectedCallsign={selectedAircraft?.callsign}
         onExitFollow={() => setIsFollowMode(false)}
+        onTriggerAssistant={(q) => {
+          setAssistantQuery(q || '');
+          setAssistantOpen(true);
+        }}
       />
 
       {/* Right Rail Flight Telemetry Dossier Panel */}
@@ -236,6 +245,21 @@ function MapViewContent() {
         onSelectFlight={(callsign) => {
           setSelectedAircraftId(callsign);
           setSearchOpen(false);
+        }}
+        onTriggerAssistant={(q) => {
+          setAssistantQuery(q || '');
+          setAssistantOpen(true);
+        }}
+      />
+
+      {/* Ask Aeroloom Grounded AI Assistant Panel */}
+      <AskAeroloomPanel
+        isOpen={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        initialQuery={assistantQuery}
+        contextHint={{
+          selectedFlightId: selectedAircraft?.id,
+          selectedCallsign: selectedAircraft?.callsign,
         }}
       />
 

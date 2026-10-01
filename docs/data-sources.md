@@ -91,6 +91,25 @@ This document registers every third-party data provider, telemetry stream, and t
 
 ---
 
+## 7. AI Flight Intelligence: OpenRouter (Free Inference Tier)
+
+*Verified against OpenRouter documentation as of October 2026.*
+
+| Property | Detail |
+|---|---|
+| **Primary API Endpoint** | `https://openrouter.ai/api/v1/chat/completions` |
+| **Model Selection Mechanism** | Explicit `:free` suffix (e.g., `meta-llama/llama-3.3-70b-instruct:free`, `google/gemini-2.0-flash-exp:free`, `qwen/qwen-2.5-coder-32b-instruct:free`) or the dynamic auto-fallback `openrouter/free` router. |
+| **Free-Tier Rate Limits** | Standard Free Tier: **20 requests/minute** and **50 requests/day**. Accounts with ≥$10 lifetime credit purchase unlock **1,000 requests/day** while retaining the 20 req/min burst limiter. |
+| **Streaming & Response Format** | OpenAI-compatible Server-Sent Events (`text/event-stream`). Chunks arrive as `data: {"choices":[{"delta":{"content":"..."}}]}` terminated by `data: [DONE]`. |
+| **Tool Calling & Function Calling** | Supported natively on selected free models (e.g., Llama 3.3 70B, Qwen 2.5 Coder, Gemini 2.0 Flash) and dynamically routed via `openrouter/free` when `tools` schema is provided. |
+| **Aeroloom Architecture Protection** | **Two-stage Deterministic Grounding & Retrieval**: Rather than trusting LLMs to initiate hallucinated network calls, Aeroloom's server-side tool orchestration classifies the intent, executes internal typed tools (`getFlight`, `searchFlights`, `getAirportWeather`, `getAirportTraffic`) against verified local/cached data, and injects strictly delimited, sanitized XML context `<flight_telemetry>` into the system prompt. |
+| **Security & Injection Defense** | Upstream callsigns, pilot remarks, and user questions are treated as untrusted text strings: control characters stripped, length bounded (≤500 chars), and wrapped in non-executable data delimiters. |
+| **Model Fallback Chain** | Configurable via `ASSISTANT_MODELS`. Default chain: `meta-llama/llama-3.3-70b-instruct:free` -> `google/gemini-2.0-flash-exp:free` -> `qwen/qwen-2.5-coder-32b-instruct:free` -> `openrouter/free`. Hard 20-second timeout per hop before cascading. |
+| **Terms & Attribution** | Subject to OpenRouter Terms of Service and underlying model licenses (Llama 3 Community License, Gemma Terms, etc.). Commercial use governed by respective open-weights license agreements. |
+| **Required UI Attribution** | "Inference powered by OpenRouter free model router. AI responses are generated from live ADS-B telemetry and METAR feeds; not for flight planning or operational safety." |
+
+---
+
 ## Summary of Architectural Protections
 
 1. **No Client-Side Upstream Calls**: Browsers **never** call external APIs directly. Every query routes through Next.js server route handlers (`/api/*`).

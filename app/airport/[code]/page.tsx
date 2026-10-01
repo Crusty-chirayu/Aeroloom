@@ -12,6 +12,7 @@ import { MetarWeatherCard } from '@/components/airport/MetarWeatherCard';
 import { AirportRadarScope } from '@/components/airport/AirportRadarScope';
 import { AirportRadarScopeBentoTile } from '@/components/airport/AirportRadarScopeBentoTile';
 import { AuthUserMenu } from '@/components/user/AuthUserMenu';
+import { AskAeroloomPanel } from '@/components/assistant/AskAeroloomPanel';
 import type { AircraftState, WeatherReport } from '@/lib/providers/types';
 
 interface AirportPageProps {
@@ -31,6 +32,7 @@ export default function AirportDetailPage({ params }: AirportPageProps) {
   const [isLoadingWeather, setIsLoadingWeather] = useState(true);
   const [isLoadingTraffic, setIsLoadingTraffic] = useState(true);
   const [currentTime, setCurrentTime] = useState<string>('');
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   // Fetch METAR weather and nearby traffic
   const fetchAirportData = useCallback(async () => {
@@ -171,6 +173,15 @@ export default function AirportDetailPage({ params }: AirportPageProps) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setAssistantOpen(true)}
+              className="text-xs font-mono px-2.5 py-1.5 rounded-sm border border-[var(--signal)]/30 text-[var(--signal-ink)] bg-[var(--signal-wash)] hover:bg-[var(--signal-wash)]/80 flex items-center gap-1.5 transition-colors"
+              title="Ask Aeroloom Grounded AI"
+            >
+              <Icon name="radar" size={14} className="text-[var(--signal)]" />
+              <span>Ask AI</span>
+            </button>
             <Link href={`/map?lat=${airport.latitude}&lng=${airport.longitude}&z=10`}>
               <Button variant="ink" size="sm" icon="plane">
                 Radar
@@ -431,6 +442,13 @@ export default function AirportDetailPage({ params }: AirportPageProps) {
           </div>
         </footer>
       </main>
+
+      {/* Ask Aeroloom Grounded AI Assistant */}
+      <AskAeroloomPanel
+        isOpen={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        contextHint={{ airportIcao: airport.icao }}
+      />
     </div>
   );
 }

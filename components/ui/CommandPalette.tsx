@@ -10,6 +10,7 @@ export interface CommandPaletteProps {
   onOpenChange?: (open: boolean) => void;
   onSelectFlight?: (callsign: string) => void;
   onSelectAirport?: (icao: string) => void;
+  onTriggerAssistant?: (initialQuery?: string) => void;
 }
 
 export function CommandPalette({
@@ -17,6 +18,7 @@ export function CommandPalette({
   onOpenChange: setControlledOpen,
   onSelectFlight,
   onSelectAirport,
+  onTriggerAssistant,
 }: CommandPaletteProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
@@ -87,6 +89,37 @@ export function CommandPalette({
               <p className="font-medium text-[var(--ink-2)]">No radar contacts matching &ldquo;{search}&rdquo;</p>
               <p className="text-[12px] text-[var(--ink-4)] mt-1">Try searching by callsign, hex, IATA code, or airline</p>
             </Command.Empty>
+
+            {/* AI Assistant Group */}
+            <Command.Group
+              heading="Ask Aeroloom (AI Grounded Intelligence)"
+              className="px-2 py-1.5 text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--signal)] [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-semibold"
+            >
+              <Command.Item
+                value={`Ask Aeroloom AI Assistant: ${search || 'flight telemetry weather airspace'}`}
+                onSelect={() => {
+                  onTriggerAssistant?.(search);
+                  setOpen(false);
+                }}
+                className="flex items-center justify-between px-3 py-2.5 rounded-[var(--r-md)] text-sm cursor-pointer select-none transition-colors data-[selected=true]:bg-[var(--signal-wash)] data-[selected=true]:text-[var(--signal-ink)]"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[var(--signal-wash)] flex items-center justify-center text-[var(--signal-ink)] shrink-0">
+                    <Icon name="radar" size={15} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-[var(--ink)]">Ask Aeroloom</span>
+                      <span className="text-[13px] text-[var(--ink-2)]">
+                        {search ? `Ask: "${search}"` : 'Ask grounded AI flight question'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] font-mono text-[var(--ink-3)]">Live ADS-B telemetry · NOAA METAR · Zero hallucination</p>
+                  </div>
+                </div>
+                <Chip variant="sky">Grounded AI</Chip>
+              </Command.Item>
+            </Command.Group>
 
             {/* Quick Suggestions / Recents Group */}
             <Command.Group

@@ -92,3 +92,7 @@ export function getDefaultFlightProvider(): FlightProvider {
   }
   return defaultProviderInstance;
 }
+
+export function setDefaultFlightProvider(provider: FlightProvider | null): void {
+  defaultProviderInstance = provider;
+}
