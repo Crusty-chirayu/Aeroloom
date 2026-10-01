@@ -24,11 +24,12 @@ const instrumentSerif = Instrument_Serif({
   display: "swap",
 });
 
+import { siteConfig } from "@/lib/site-config";
+
 export const metadata: Metadata = {
-  title: "Aeroloom — Live Flight Intelligence",
-  description:
-    "Real-time ADS-B flight tracking with editorial-quality data presentation. Watch the global airspace in motion.",
-  metadataBase: new URL("https://aeroloom.vercel.app"),
+  title: `${siteConfig.name} — ${siteConfig.tagline}`,
+  description: siteConfig.description,
+  metadataBase: new URL(siteConfig.url),
 };
 
 export default function RootLayout({

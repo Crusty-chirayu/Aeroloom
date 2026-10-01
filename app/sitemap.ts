@@ -1,8 +1,9 @@
 import { MetadataRoute } from 'next';
 import { GLOBAL_AIRPORTS } from '@/lib/airports/airportData';
+import { siteConfig } from '@/lib/site-config';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://aeroloom.vercel.app';
+  const baseUrl = siteConfig.url;
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [

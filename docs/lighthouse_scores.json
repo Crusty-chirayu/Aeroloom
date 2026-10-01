@@ -1,0 +1,26 @@
+{
+  "/": {
+    "performance": 46,
+    "accessibility": 98,
+    "bestPractices": 100,
+    "seo": 100
+  },
+  "/map": {
+    "performance": 42,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100
+  },
+  "/flight/DAL397": {
+    "performance": 62,
+    "accessibility": 100,
+    "bestPractices": 96,
+    "seo": 100
+  },
+  "/airport/KJFK": {
+    "performance": 25,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100
+  }
+}
