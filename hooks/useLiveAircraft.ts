@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import type { AircraftState, Bounds } from '@/lib/providers/types';
-import type { PositionSample } from '@/lib/providers/positions/types';
-import { AircraftInterpolator } from '@/lib/map/interpolation';
+import type { AircraftState, Bounds } from '../lib/providers/types.ts';
+import type { PositionSample } from '../lib/providers/positions/types.ts';
+import { AircraftInterpolator } from '../lib/map/interpolation.ts';
 
 export interface SectorDefinition {
   id: string;
@@ -193,8 +193,12 @@ export function useLiveAircraft({
       setIsLoading(false);
       setIsDegraded(true);
 
-      // Friendly UI message, never raw HTTP dumps
-      setError('No live data source is reachable right now. Retrying…');
+      // Only show full error banner if 3+ consecutive failures AND no aircraft data to show
+      if (consecutiveFailuresRef.current >= 3 && aircraft.length === 0) {
+        setError('No live data source is reachable right now. Retrying…');
+      } else {
+        setError(null);
+      }
 
       // Automatic backoff retry (5s, 10s, max 30s)
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
@@ -205,7 +209,7 @@ export function useLiveAircraft({
         }
       }, backoffMs);
     }
-  }, [enabled, activeBounds, activeZoom, sector, selectedAircraftId, interpolator]);
+  }, [enabled, activeBounds, activeZoom, sector, selectedAircraftId, interpolator, aircraft]);
 
   useEffect(() => {
     fetchAircraftRef.current = fetchAircraft;

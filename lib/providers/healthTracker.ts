@@ -87,8 +87,12 @@ export function recordProviderFailure(
   health.lastHttpStatus = httpStatus;
   health.lastError = errorMsg;
   health.consecutiveFailures += 1;
-  health.circuitState = 'open';
-  health.circuitOpenUntil = now + CIRCUIT_BREAKER_COOLDOWN_MS;
+
+  // Open circuit breaker after 3 consecutive failures or 403 Forbidden
+  if (health.consecutiveFailures >= 3 || httpStatus === 403) {
+    health.circuitState = 'open';
+    health.circuitOpenUntil = now + CIRCUIT_BREAKER_COOLDOWN_MS;
+  }
 }
 
 export function getProviderHealth(name: string): ProviderHealth {

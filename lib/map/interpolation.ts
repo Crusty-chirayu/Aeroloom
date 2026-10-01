@@ -8,9 +8,9 @@
  * 4. Computes altitude-proportional ground shadow offsets.
  */
 
-import type { AircraftState } from '@/lib/providers/types';
-import { getAircraftCategory } from './typeMapping';
-import { getAircraftSpriteId } from './spriteAtlas';
+import type { AircraftState } from '../providers/types.ts';
+import { getAircraftCategory } from './typeMapping.ts';
+import { getAircraftSpriteId } from './spriteAtlas.ts';
 
 export interface InterpolatedAircraft {
   id: string; // icao24

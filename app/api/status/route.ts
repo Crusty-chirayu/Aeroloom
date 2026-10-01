@@ -3,8 +3,6 @@ import { getCacheService } from '@/lib/cache';
 import {
   getServerStartTime,
   getAllProviderHealth,
-  recordProviderSuccess,
-  recordProviderFailure,
 } from '@/lib/providers/healthTracker';
 import { AdsbFiProvider } from '@/lib/providers/adsbFiProvider';
 import { AdsbLolProvider } from '@/lib/providers/adsbLolProvider';
@@ -21,21 +19,20 @@ async function probeProvidersIfStale() {
   }
   lastProbeTime = now;
 
+  const probeBounds = { south: 40.5, north: 41.0, west: -74.2, east: -73.7 };
   const providers = [
-    new AdsbFiProvider(3000),
-    new AdsbLolProvider(3000),
-    new AirplanesLiveProvider(3000),
-    new OpenSkyProvider(3000),
+    new AdsbFiProvider(5000),
+    new AdsbLolProvider(5000),
+    new AirplanesLiveProvider(5000),
+    new OpenSkyProvider(5000),
   ];
 
   await Promise.allSettled(
     providers.map(async (p) => {
       try {
-        await p.getAircraftByCallsign('SWA1');
-        recordProviderSuccess(p.name, 200);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Probe failure';
-        recordProviderFailure(p.name, msg, null);
+        await p.getAircraftInBounds(probeBounds);
+      } catch {
+        // Health tracking is handled inside provider.getAircraftInBounds
       }
     })
   );

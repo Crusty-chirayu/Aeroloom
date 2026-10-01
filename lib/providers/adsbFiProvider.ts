@@ -114,13 +114,14 @@ export class AdsbFiProvider implements FlightProvider {
       clearTimeout(timer);
 
       if (!res.ok) {
-        recordProviderFailure(this.name, `HTTP ${res.status}`, res.status);
+        if (res.status >= 500) {
+          recordProviderFailure(this.name, `HTTP ${res.status}`, res.status);
+        }
         return null;
       }
 
       const json = (await res.json()) as RawReadsbResponse & { aircraft?: unknown[] };
       if (json.error) {
-        recordProviderFailure(this.name, json.error, res.status);
         return null;
       }
 
@@ -139,10 +140,8 @@ export class AdsbFiProvider implements FlightProvider {
 
       const enriched = enrichAircraftPositions([norm]);
       return toAircraftState(enriched[0], now);
-    } catch (err: unknown) {
+    } catch {
       clearTimeout(timer);
-      const msg = err instanceof Error ? err.message : 'Lookup error';
-      recordProviderFailure(this.name, msg, null);
       return null;
     }
   }

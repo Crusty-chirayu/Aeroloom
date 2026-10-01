@@ -281,7 +281,7 @@ function MapViewContent() {
           <div className="pointer-events-auto bg-amber-50 border border-amber-300 text-amber-900 px-3 py-2 rounded-sm text-xs font-mono shadow-md flex items-center justify-between gap-3 animate-in fade-in">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <span>Telemetry Delayed · Serving Cache</span>
+              <span>Live feed delayed</span>
             </div>
             <button
               onClick={refresh}
