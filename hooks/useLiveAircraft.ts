@@ -116,6 +116,7 @@ export function useLiveAircraft({
           trackDeg: 78,
           verticalRateFpm: 0,
           squawk: '2411',
+          onGround: false,
           source: 'airplanes.live',
           updatedAt: Date.now(),
         });

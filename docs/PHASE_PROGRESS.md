@@ -362,3 +362,124 @@ All PNG file headers verified with binary parsing:
    - *Fix*: Replaced with custom great-circle dashed indicator with central signal target pip, and clear origin/destination resolution typography.
 5. **Weakness 5 (Mobile Action Bar Clipping)**: Action buttons ("Follow", "Full Dossier") sat flush with bottom edge on mobile.
    - *Fix*: Added `pb-8` bottom padding to mobile sheet content for safe-area compliance.
+
+---
+
+## Phase 4: Flight, Airport, Search, Data Pages Implementation Plan
+
+### Goals
+Deliver complete, rich, editorial pages for all primary entities:
+1. `/flight/[id]`: Full editorial flight dossier (route header, progress indicator, mono stats, Phase 2 technical blueprint, SVG altitude & speed charts, mini MapLibre radar map, honest attribution, graceful partial-data and 404/not-airborne states).
+2. `/airport/[code]`: Airport dossier with decoded METAR in plain language, wind arrow, VFR/MVFR/IFR/LIFR flight category chip, nearby traffic list + mini terminal radar map, honest data labeling.
+3. `/airports`: Typographic searchable/filterable table (not generic cards) with region & category filters.
+4. `/search`: Full-page search with `/api/search` grouped results, keyboard navigation, and recent searches.
+5. `/about/data`: Deep transparency document covering telemetry sources, cartography, weather feeds, update frequencies, and licensing.
+6. `app/not-found.tsx` & `app/error.tsx`: Editorial error pages with custom aviation linework.
+7. Shared navigation & route metadata.
+
+### Implementation Checklist
+- [x] `app/api/aircraft/[id]/route.ts`: Implement single aircraft lookup by 24-bit hex or callsign with caching and request coalescing.
+- [x] `app/flight/[flightId]/page.tsx`: Full editorial flight dossier with blueprint, SVG charts, mini-map, telemetry grid, and partial-data resiliency.
+- [x] `app/airport/[code]/page.tsx`: Airport dossier with decoded METAR, wind vector, terminal traffic radar mini-map, and runway data.
+- [x] `app/airports/page.tsx`: Typographic table with region filter, search, coordinates, elevation, and direct actions.
+- [x] `app/search/page.tsx`: Rich full-page search with instant results, grouped categories, keyboard shortcuts, and quick links.
+- [x] `app/about/data/page.tsx`: Editorial transparency document based on `docs/data-sources.md`.
+- [x] `app/not-found.tsx` & `app/error.tsx`: Refined editorial 404 & error pages with custom linework and navigation.
+- [x] Verification Gate: `tsc` (0 errors), `lint` (0 warnings), `npm test` (141/141 pass), `npm run build` (17 routes), `scripts/check-overflow.mjs` (50/50 pass), Playwright screenshots at 390/768/1280/1728px (28 files verified with binary parsing), Self-Critique with 5 fixed weaknesses.
+
+### 2. Lint & Code Quality Status
+- `npx tsc --noEmit`: **0 errors**.
+- `npm run lint`: **0 errors, 0 warnings** (completely clean!).
+- `npm test`: **141 / 141 tests passing** (38 suites, including comprehensive `tests/phase4-pages.test.ts`).
+- `npm run build`: **Compiled successfully in 4.8s**; all 17 routes generated and statically optimized.
+
+### 3. Horizontal Overflow Validation (Real Outputs)
+```
+Checking horizontal overflow across 10 routes at 5 viewports...
+Checking /               : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/kit        : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/aircraft   : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /dev/icons      : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /map            : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /search         : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /airports       : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /about/data     : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /flight/DAL397  : ✓ PASS [360, 390, 768, 1280, 1728]
+Checking /airport/KJFK   : ✓ PASS [360, 390, 768, 1280, 1728]
+
+--- OVERFLOW CHECK SUMMARY ---
+Passed: 50 / 50 (100%)
+SUCCESS: All routes passed zero horizontal overflow check at all target viewports!
+```
+
+### 4. Verified Screenshot Evidence (`docs/screenshots/phase4/`)
+All 28 PNG file headers verified with binary dimension parsing:
+- `flight_dossier_DAL397_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `flight_not_found_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `airport_dossier_KJFK_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `airports_index_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `search_page_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `about_data_page_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+- `not_found_404_390px.png` (390 × 844 px), `768px.png` (768 × 1024 px), `1280px.png` (1280 × 800 px), `1728px.png` (1728 × 1080 px)
+
+### 5. Self-Critique & Applied Fixes (Mandatory Step)
+1. **Weakness 1 (Airport Database Duplicate React Keys)**: `lib/airports/airportData.ts` contained duplicated entries for Delhi (`VIDP`) and Mumbai (`VABB`), causing key collision warnings in React.
+   - *Fix*: Cleaned `GLOBAL_AIRPORTS` catalog, deduplicating `VIDP` and `VABB` while preserving `VOBL` (Bengaluru) and ensuring all keys are globally unique.
+2. **Weakness 2 (Wind Vector Compass Precision in METAR Card)**: In `components/airport/MetarWeatherCard.tsx`, the rotating wind arrow had only a simple top indicator without aeronautical cardinal reference points.
+   - *Fix*: Added N, S, E, W cardinal labels with inner shadow and refined vector arrow alignment to reflect aviation standard dial instruments.
+3. **Weakness 3 (Flight Dossier Not Airborne Navigation)**: When viewing a flight that is not currently airborne, users were given queries but had no direct links to test active airborne callsigns.
+   - *Fix*: Added a curated "SAMPLE ACTIVE AIRBORNE IDENTIFIERS" block (`DLH400`, `BAW178`, `UAE201`, `AFR006`, `SWA123`) for 1-click active flight testing.
+4. **Weakness 4 (Mobile Header Action Spacing Across Sub-Pages)**: Headers with multiple actions caused wrapping or right-side compression on 360px and 390px screens.
+   - *Fix*: Applied `hidden sm:inline-flex` to secondary actions (e.g. Share, Copy, secondary navigation) while keeping primary Radar CTA and back button compact.
+5. **Weakness 5 (Typography in Data Provenance Feature Cards)**: Early card titles used display serif which crowded narrow 3-column layouts.
+   - *Fix*: Replaced with `font-mono text-sm font-bold text-[var(--ink)]` ensuring crisp, technical readability matching DESIGN_SPEC.md §4.
+
+---
+
+## Phase 5A: Landing Page Hero & Pinned Story Section Implementation Plan
+
+### Goals
+Build the flagship landing page at route `/` per DESIGN_SPEC.md §3, §7, §10 and ANTIGRAVITY_PHASE_PROMPTS.md Phase 5A:
+1. **Lenis Smooth Scroll & GSAP Integration**:
+   - Lenis smooth scroll mounted strictly on route `/` (never on `/map` or other pages).
+   - GSAP + ScrollTrigger registration with `useReducedMotion` fallback (fades, no pin, no smooth scroll if preferred).
+2. **Floating Pill Nav**:
+   - Transparent at scroll pos 0, transitions to paper background with hairline border on scroll.
+   - Aeroloom logo wordmark, links (`Map`, `Airports`, `Data`, `Search`), and "Open live map" CTA button with arrow slide.
+3. **Preloader Arc** (max 1.1s, once per session):
+   - Hairline great-circle arc draws across screen.
+   - Tiny aircraft rides the curve.
+   - Monospace counter ticks to real live airborne count.
+   - Clean vertical wipe reveal into the hero.
+   - Skippable with Escape/click, skipped on subsequent visits (`sessionStorage`).
+4. **Hero Section**:
+   - Display-xl headline: "Every flight. *Right now.*" with roman/italic mix and masked line reveal.
+   - One-sentence subline (18 words max, specific, confident).
+   - Primary "Open the live map" CTA with sliding signal arrow.
+   - Secondary inline search trigger that summons the real command palette with real results.
+   - Monospace live telemetry strip with ticking tabular numbers (airborne count, max speed, highest cruise).
+5. **Hero Background (Non-Interactive Live Drift Map)**:
+   - Real light-themed MapLibre instance with live aircraft gliding as small ink silhouettes (few in signal color).
+   - Calm, scripted camera drift between busy corridors (e.g. North Atlantic, Europe, Southeast Asia).
+   - STRICT RULE: NOT cursor-reactive, NOT mouse-driven, NOT scroll-parallaxed.
+   - Soft gradient mask around edges fading smoothly into paper (`#F6F4EE`).
+   - Pause rendering when scrolled out of viewport (IntersectionObserver).
+   - Pre-rendered static map fallback if telemetry is offline.
+6. **"Follow One Flight" Pinned Section (~300vh)**:
+   - Pins cleanly with ScrollTrigger, scrubs 1:1 with scroll.
+   - Great-circle flight corridor draws across large projection map.
+   - Aircraft silhouette rotates along the curve's exact tangent.
+   - Dynamic telemetry dashboard updates altitude, speed, and remaining distance with animated tabular numbers and self-drawing altitude profile SVG.
+   - Narrative beats update in 3 masked transitions:
+     - Beat 1: *Departure & Initial Climb*
+     - Beat 2: *Transoceanic Cruise at FL380*
+     - Beat 3: *Terminal Descent & Final Approach*
+   - Unpins cleanly into next section without scroll jumping.
+7. **Strict Performance & Quality Gates**:
+   - No cursor-reactive logic (`grep` proof).
+   - First-load JS budget and zero CLS.
+   - Full reduced motion support.
+   - Zero ESLint warnings, zero TypeScript errors, 100% test pass.
+   - Playwright screenshots at 390, 768, 1280, 1728 px with verified dimensions.
+
+

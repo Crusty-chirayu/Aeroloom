@@ -203,3 +203,12 @@ export const AEROLOOM_LIGHT_MAP_STYLE: StyleSpecification = {
     },
   ],
 };
+
+export function createAeroloomMapStyle(_options?: {
+  showAirports?: boolean;
+  showDayNight?: boolean;
+  showRainViewer?: boolean;
+}): StyleSpecification {
+  return JSON.parse(JSON.stringify(AEROLOOM_LIGHT_MAP_STYLE));
+}
+

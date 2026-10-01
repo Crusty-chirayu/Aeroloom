@@ -28,7 +28,7 @@ import {
   // User
   User, LogIn, LogOut,
   // Environment / Weather
-  Moon, Sun, Wind, Zap, Flag,
+  Moon, Flag,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -92,10 +92,12 @@ export const LUCIDE_ICONS = {
   login: LogIn,
   logout: LogOut,
   moon: Moon,
-  sun: Sun,
-  wind: Wind,
-  zap: Zap,
   flag: Flag,
+  radar: Radio,
+  check: CheckCircle2,
+  x: X,
+  'external-link': ArrowUpRight,
+  'shield-check': CheckCircle2,
 } as const satisfies Record<string, LucideIcon>;
 
 // ─── Custom Aviation Icons Registry ──────────────────────────────────────────
