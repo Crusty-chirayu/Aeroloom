@@ -97,9 +97,10 @@ export function normalizeAircraftRecord(
   }
 
   // Timestamp
-  let timestamp = fallbackTimestamp;
+  const safeFallback = fallbackTimestamp < 1e11 ? fallbackTimestamp * 1000 : fallbackTimestamp;
+  let timestamp = safeFallback;
   if (typeof r.seen_pos === 'number' && !isNaN(r.seen_pos)) {
-    timestamp = fallbackTimestamp - Math.round(r.seen_pos * 1000);
+    timestamp = safeFallback - Math.round(r.seen_pos * 1000);
   }
 
   return {

@@ -86,7 +86,7 @@ export class AirplanesLiveProvider implements FlightProvider {
 
     recordProviderSuccess(this.name, res.status);
 
-    const now = typeof json.now === 'number' ? json.now : Date.now();
+    const now = typeof json.now === 'number' ? (json.now < 1e11 ? json.now * 1000 : json.now) : Date.now();
     const rawList = json.ac;
 
     const rawPositions = [];

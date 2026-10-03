@@ -131,7 +131,9 @@ export interface ApiResponse<T> {
  * Converts legacy AircraftPosition to canonical AircraftState.
  */
 export function toAircraftState(pos: AircraftPosition, now: number = Date.now()): AircraftState {
-  const ageSeconds = Math.max(0, Math.round((now - pos.timestamp) / 1000));
+  const safeTimestamp = pos.timestamp < 1e11 ? pos.timestamp * 1000 : pos.timestamp;
+  const safeNow = now < 1e11 ? now * 1000 : now;
+  const ageSeconds = Math.max(0, Math.round((safeNow - safeTimestamp) / 1000));
   return {
     id: pos.id.toLowerCase(),
     callsign: pos.callsign,
@@ -145,7 +147,7 @@ export function toAircraftState(pos: AircraftPosition, now: number = Date.now())
     verticalRateFpm: pos.verticalRate,
     onGround: Boolean(pos.isGround),
     squawk: pos.squawk,
-    updatedAt: pos.timestamp,
+    updatedAt: safeTimestamp,
     ageSeconds,
     source: pos.source,
     airline: pos.airline,

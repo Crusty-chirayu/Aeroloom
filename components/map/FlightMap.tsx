@@ -487,7 +487,7 @@ export function FlightMap({
         const shadowSource = map.getSource('aircraft-shadow') as GeoJSONSource;
 
         if (aircraftSource && shadowSource) {
-          interpolator.step(timestamp, (renderedList: RenderedAircraft[]) => {
+          interpolator.step(Date.now(), (renderedList: RenderedAircraft[]) => {
             const currentFilters = filtersRef.current;
             const currentSelectedId = selectedIdRef.current;
             const currentFollow = isFollowModeRef.current;

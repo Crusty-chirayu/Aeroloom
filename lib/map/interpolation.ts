@@ -80,6 +80,10 @@ export class AircraftInterpolator {
       const category = getAircraftCategory(ac.typeCode);
       const existing = this.aircraftMap.get(ac.id);
 
+      const safeBatchNow = nowMs < 1e11 ? nowMs * 1000 : nowMs;
+      const rawTimestamp = ac.updatedAt || safeBatchNow;
+      const safeAcTime = rawTimestamp < 1e11 ? rawTimestamp * 1000 : rawTimestamp;
+
       if (!existing) {
         // New aircraft appearing
         this.aircraftMap.set(ac.id, {
@@ -91,8 +95,8 @@ export class AircraftInterpolator {
           targetLat: ac.lat,
           startLng: ac.lon,
           startLat: ac.lat,
-          lastUpdatedMs: nowMs,
-          correctionStartMs: nowMs,
+          lastUpdatedMs: safeAcTime,
+          correctionStartMs: safeBatchNow,
           correctionDurationMs: 0,
           groundSpeedKt: ac.groundSpeedKt ?? 0,
           altitudeFt: ac.altitudeFt ?? 0,
@@ -113,8 +117,8 @@ export class AircraftInterpolator {
         existing.altitudeFt = ac.altitudeFt ?? existing.altitudeFt;
         existing.verticalRateFpm = ac.verticalRateFpm ?? existing.verticalRateFpm;
         existing.onGround = ac.onGround;
-        existing.lastUpdatedMs = nowMs;
-        existing.correctionStartMs = nowMs;
+        existing.lastUpdatedMs = safeAcTime;
+        existing.correctionStartMs = safeBatchNow;
         existing.correctionDurationMs = CORRECTION_DURATION_MS;
         existing.raw = ac;
       }
@@ -131,6 +135,9 @@ export class AircraftInterpolator {
     aircraftGeoJson: GeoJSON.FeatureCollection;
     shadowGeoJson: GeoJSON.FeatureCollection;
   } {
+    // Defend against performance.now() or DOMHighResTimeStamp being passed in
+    const effectiveNowMs = typeof nowMs === 'number' && nowMs > 1e11 ? nowMs : Date.now();
+
     if (onStep) {
       onStep(Array.from(this.aircraftMap.values()));
     }
@@ -139,7 +146,7 @@ export class AircraftInterpolator {
     const idsToEvict: string[] = [];
 
     this.aircraftMap.forEach((ac, id) => {
-      const ageSeconds = (nowMs - ac.lastUpdatedMs) / 1000;
+      const ageSeconds = Math.max(0, (effectiveNowMs - ac.lastUpdatedMs) / 1000);
 
       // 180s rule: Evict dead telemetry
       if (ageSeconds > 180) {
@@ -149,9 +156,9 @@ export class AircraftInterpolator {
 
       // 1. Position Easing (blend from start to target)
       if (ac.correctionDurationMs > 0) {
-        const elapsed = nowMs - ac.correctionStartMs;
-        if (elapsed < ac.correctionDurationMs) {
-          const t = Math.min(1, elapsed / ac.correctionDurationMs);
+        const elapsed = effectiveNowMs - ac.correctionStartMs;
+        if (elapsed < ac.correctionDurationMs && elapsed >= 0) {
+          const t = Math.max(0, Math.min(1, elapsed / ac.correctionDurationMs));
           const factor = easeOutCubic(t);
           ac.currentLng = ac.startLng + (ac.targetLng - ac.startLng) * factor;
           ac.currentLat = ac.startLat + (ac.targetLat - ac.startLat) * factor;

@@ -31,8 +31,8 @@ async function run() {
   });
 
   console.log('Navigating to http://localhost:3000/map...');
-  await page.goto('http://localhost:3000/map', { waitUntil: 'networkidle', timeout: 30000 });
-  await page.waitForTimeout(5000); // Allow MapLibre to load tiles and render aircraft batch
+  await page.goto('http://localhost:3000/map', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForTimeout(8000); // Allow MapLibre to load tiles, sprites and render aircraft batch
 
   // Query rendered aircraft symbols directly from MapLibre
   const symbolStats = await page.evaluate(async () => {
@@ -41,19 +41,16 @@ async function run() {
       return { mapFound: false, renderedSymbols: 0, sourceFeatures: 0 };
     }
 
-    const source = map.getSource('aircraft');
-    const sourceData = source?._data;
-    const sourceFeatures = sourceData?.features?.length || 0;
-
-    const rendered = map.queryRenderedFeatures({ layers: ['aircraft-layer'] });
+    const sourceFeatures = map.querySourceFeatures('aircraft') || [];
+    const rendered = map.queryRenderedFeatures({ layers: ['aircraft-layer'] }) || [];
     return {
       mapFound: true,
-      sourceFeatures,
+      sourceFeatures: sourceFeatures.length,
       renderedSymbols: rendered.length,
     };
   });
 
-  const artifactDir = 'C:/Users/Allah/.gemini/antigravity-ide/brain/d4bc9352-3d42-4f4e-9f20-88a99dbdccdc';
+  const artifactDir = 'C:/Users/Allah/.gemini/antigravity-ide/brain/7fcd9b85-897c-4dee-a950-18266e860055';
   const screenshotPath = path.join(artifactDir, 'map_verified_aircraft.png');
   await page.screenshot({ path: screenshotPath, fullPage: false });
 
