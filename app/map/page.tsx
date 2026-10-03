@@ -26,11 +26,30 @@ function MapViewContent() {
   const searchParams = useSearchParams();
 
   // Initial parameters from URL
-  const initialLat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : 40.64;
-  const initialLng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : -73.78;
-  const initialZoom = searchParams.get('z') ? parseFloat(searchParams.get('z')!) : 8;
+  const rawLat = searchParams.get('lat') ? parseFloat(searchParams.get('lat')!) : 40.64;
+  const rawLng = searchParams.get('lng') ? parseFloat(searchParams.get('lng')!) : -73.78;
+  const rawZoom = searchParams.get('z') ? parseFloat(searchParams.get('z')!) : 8;
+
+  // Sanitize coordinates - guard against polar jumps (|lat| > 75), NaNs, or out-of-range bounds
+  const initialLat = isNaN(rawLat) || Math.abs(rawLat) > 75 ? 40.64 : rawLat;
+  const initialLng = isNaN(rawLng) || Math.abs(rawLng) > 180 ? -73.78 : rawLng;
+  const initialZoom = isNaN(rawZoom) || rawZoom < 1 || rawZoom > 18 ? 8 : rawZoom;
   const initialFlight = searchParams.get('flight') || null;
   const initialRadar = searchParams.get('radar') === '1';
+
+  // Sanitize invalid or polar coordinates in browser URL on mount
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      (isNaN(rawLat) || Math.abs(rawLat) > 75 || isNaN(rawLng) || Math.abs(rawLng) > 180)
+    ) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('lat', initialLat.toFixed(4));
+      url.searchParams.set('lng', initialLng.toFixed(4));
+      url.searchParams.set('z', initialZoom.toFixed(1));
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [rawLat, rawLng, initialLat, initialLng, initialZoom]);
 
   // Live Aircraft Telemetry Hook
   const {

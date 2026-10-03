@@ -468,19 +468,11 @@ export function FlightMap({
   }, [selectedTrail]);
 
   // 4. Center Camera on Selected Aircraft
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !selectedAircraftId) return;
+  const centeredFlightIdRef = useRef<string | null>(null);
 
-    const ac = interpolator.get(selectedAircraftId);
-    if (ac && Number.isFinite(ac.raw.lat) && Number.isFinite(ac.raw.lon)) {
-      map.easeTo({
-        center: [normalizeLng(ac.raw.lon), clampLat(ac.raw.lat)],
-        duration: 800,
-        padding: { right: window.innerWidth > 768 ? 420 : 0 },
-      });
-    }
-  }, [selectedAircraftId, interpolator]);
+  useEffect(() => {
+    centeredFlightIdRef.current = null;
+  }, [selectedAircraftId]);
 
   // 5. 60 FPS Dead-Reckoning RAF Loop
   useEffect(() => {
@@ -574,6 +566,16 @@ export function FlightMap({
                   iconImage: shadowSpriteId,
                 },
               });
+
+              // Initial smooth centering when an aircraft is first selected or loaded from URL
+              if (currentSelectedId === item.id && centeredFlightIdRef.current !== currentSelectedId) {
+                centeredFlightIdRef.current = currentSelectedId;
+                map.easeTo({
+                  center: [safeLng, safeLat],
+                  duration: 800,
+                  padding: { right: typeof window !== 'undefined' && window.innerWidth > 768 ? 420 : 0 },
+                });
+              }
 
               // Camera follow lock
               if (currentFollow && currentSelectedId === item.id) {

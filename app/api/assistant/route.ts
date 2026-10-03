@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { globalRateLimiter } from '@/lib/cache';
 import { sanitizeUntrustedInput, classifyAndRetrieveContext } from '@/lib/assistant/grounding';
 import { buildAssistantSystemPrompt } from '@/lib/assistant/systemPrompt';
 import { executeOpenRouterCompletion } from '@/lib/assistant/openRouterClient';
@@ -8,29 +7,7 @@ import type { AssistantContextHint } from '@/lib/assistant/types';
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
-  // 1. IP Rate Limiting (Stricter: 20 req / minute per client)
-  const clientIp =
-    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-    request.headers.get('x-real-ip') ||
-    '127.0.0.1';
-
-  const rateCheck = globalRateLimiter.check(clientIp, 20, 60000);
-  if (!rateCheck.allowed) {
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Assistant rate limit exceeded (20 requests/minute). Please wait before asking another question.',
-        timestamp: Date.now(),
-      },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': Math.ceil(rateCheck.resetMs / 1000).toString(),
-          'X-RateLimit-Remaining': '0',
-        },
-      }
-    );
-  }
+  // 1. Unlimited assistant access: No rate limiting to ensure uninterrupted chatbot assistant service
 
   // 2. Parse & Validate Input Payload
   let body: { query?: string; context?: AssistantContextHint };

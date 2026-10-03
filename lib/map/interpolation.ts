@@ -160,8 +160,8 @@ export class AircraftInterpolator {
           ac.currentLat = ac.targetLat;
           ac.correctionDurationMs = 0;
         }
-      } else if (!ac.onGround && ac.groundSpeedKt > 30) {
-        // 2. Dead-reckoning along heading at ground speed
+      } else if (!ac.onGround && ac.groundSpeedKt > 30 && ageSeconds < 10) {
+        // 2. Dead-reckoning along heading at ground speed (up to 10s max extrapolation)
         // dt in hours
         const dtHours = 1 / (60 * 3600); // 1 frame at 60 fps (~16.6ms)
         const distNm = ac.groundSpeedKt * dtHours;

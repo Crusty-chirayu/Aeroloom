@@ -213,7 +213,9 @@ export function useLiveAircraft({
       setIsStale(true);
       setIsRefreshing(false);
       setIsLoading(false);
-      setIsDegraded(true);
+      if (consecutiveFailuresRef.current >= 2) {
+        setIsDegraded(true);
+      }
 
       // Only show full error banner if 3+ consecutive failures AND no aircraft data to show
       if (consecutiveFailuresRef.current >= 3 && aircraftRef.current.length === 0) {
