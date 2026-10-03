@@ -2,8 +2,8 @@
 
 <br />
 
-<!-- Replace with your hero banner: docs/assets/hero.png -->
-<img src="docs/assets/hero.png" alt="Aeroloom — Live Flight Intelligence" width="100%" />
+![Uploading image.png…]()
+
 
 <br />
 <br />
