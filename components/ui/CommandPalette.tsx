@@ -50,12 +50,14 @@ export function CommandPalette({
     return () => document.removeEventListener('keydown', down);
   }, [isOpen, setOpen]);
 
-  // Reset search state when palette closes
-  useEffect(() => {
+  // Reset search state when palette closes without triggering cascading renders
+  const [prevOpen, setPrevOpen] = useState(isOpen);
+  if (prevOpen !== isOpen) {
+    setPrevOpen(isOpen);
     if (!isOpen) {
       setSearch('');
     }
-  }, [isOpen]);
+  }
 
   if (!isOpen) return null;
 

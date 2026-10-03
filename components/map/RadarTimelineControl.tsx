@@ -32,8 +32,8 @@ export function RadarTimelineControl({
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Ref to track last notified frame values to prevent redundant parent callbacks
-  const lastNotifiedRef = useRef<{ url: string | null; opacity: number }>({
-    url: undefined as any,
+  const lastNotifiedRef = useRef<{ url: string | null | undefined; opacity: number }>({
+    url: undefined,
     opacity: -1,
   });
 
