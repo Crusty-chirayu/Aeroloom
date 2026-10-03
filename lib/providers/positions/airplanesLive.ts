@@ -1,6 +1,6 @@
 import type { AircraftPosition, BoundingBox, PositionQuery, ProviderResponse } from './types.ts';
 
-export const USER_AGENT = 'Aeroloom-FlightTracker/0.1.0 (https://github.com/Crusty-chirayu/Aeroloom; chirayujayaswal7@gmail.com)';
+export const USER_AGENT = 'Aeroloom-FlightTracker/0.1.0 (https://github.com/Crusty-chirayu/Aeroloom; chirayujaysawal7@gmail.com)';
 
 // Default reference location: San Francisco Bay Area (KSFO / KOAK / KSJC metro sector)
 export const DEFAULT_QUERY_LOCATION: PositionQuery = {
@@ -97,9 +97,10 @@ export function normalizeAircraftRecord(
   }
 
   // Timestamp
-  let timestamp = fallbackTimestamp;
+  const safeFallback = fallbackTimestamp < 1e11 ? fallbackTimestamp * 1000 : fallbackTimestamp;
+  let timestamp = safeFallback;
   if (typeof r.seen_pos === 'number' && !isNaN(r.seen_pos)) {
-    timestamp = fallbackTimestamp - Math.round(r.seen_pos * 1000);
+    timestamp = safeFallback - Math.round(r.seen_pos * 1000);
   }
 
   return {

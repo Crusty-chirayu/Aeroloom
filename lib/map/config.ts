@@ -1,34 +1,47 @@
 /**
  * Aeroloom Flight Map Configuration
  *
- * Defines basemap styles, attribution requirements, default viewports,
- * and camera constraints for the MapLibre GL engine.
+ * Defines basemap providers, default viewports, and camera constraints
+ * for the MapLibre GL engine.
+ *
+ * NOTE: Dark basemap entries have been removed. Basemap config structure is retained.
+ * The final light style choice and custom style JSON will be built in Phase 3.
+ * Terms and attribution of candidate tile sources are documented in docs/data-sources.md.
  */
 
 export interface BasemapProvider {
   id: string;
   name: string;
+  /** Tile style JSON URL — to be finalized in Phase 3 */
   styleUrl: string;
   attribution: string;
   license: string;
   isDefault?: boolean;
 }
 
+/**
+ * PHASE 3 NOTE: The light style is built in Phase 3.
+ * Final choice, terms of service, and attribution will be recorded in docs/data-sources.md.
+ *
+ * Candidate light tile sources:
+ * - OpenFreeMap Liberty: https://tiles.openfreemap.org/styles/liberty (ODbL, free, no token)
+ * - CARTO Positron Light: https://basemaps.cartocdn.com/gl/positron-gl-style/style.json (CC-BY 4.0)
+ */
 export const BASEMAP_PROVIDERS: Record<string, BasemapProvider> = {
-  cartoDark: {
-    id: 'cartoDark',
-    name: 'CARTO Dark Matter',
-    styleUrl: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-    attribution: '© CARTO, © OpenStreetMap contributors',
-    license: 'Free for non-commercial / visualization with mandatory attribution',
+  lightPrimary: {
+    id: 'lightPrimary',
+    name: 'OpenFreeMap Liberty (Light Candidate)',
+    styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
+    attribution: '© OpenStreetMap contributors, © OpenFreeMap',
+    license: 'ODbL (see docs/data-sources.md)',
     isDefault: true,
   },
-  openFreeMapDark: {
-    id: 'openFreeMapDark',
-    name: 'OpenFreeMap Dark',
-    styleUrl: 'https://tiles.openfreemap.org/styles/dark',
-    attribution: '© OpenFreeMap, © OpenMapTiles, © OpenStreetMap contributors',
-    license: 'Open-source community tiles (ODbL / CC-BY)',
+  lightFallback: {
+    id: 'lightFallback',
+    name: 'CARTO Positron (Light Fallback Candidate)',
+    styleUrl: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    attribution: '© CARTO, © OpenStreetMap contributors',
+    license: 'CC-BY 4.0 (see docs/data-sources.md)',
   },
 };
 

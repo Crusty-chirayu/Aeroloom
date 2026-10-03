@@ -1,455 +1,494 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { use, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import {
-  Plane,
-  ArrowLeft,
-  Compass,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus,
-  Crosshair,
-  Building2,
-  Route,
-  Activity,
-  Layers,
-  Copy,
-  Check,
-  Star,
-  ExternalLink,
-  ShieldAlert,
-} from 'lucide-react';
-import type { AircraftPosition, PositionSample } from '@/lib/providers/positions/types';
-import { formatAltitude, formatSpeed, formatVerticalRate, classifyAltitudeStrata } from '@/lib/map/aircraftGeoJson';
-import { enrichAircraftPosition } from '@/lib/providers/enrichment';
-import { useUserStore } from '@/lib/storage/userStore';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { Panel } from '@/components/ui/Panel';
+import { Icon } from '@/components/ui/Icon';
+import { AircraftBlueprint } from '@/components/aircraft/AircraftBlueprint';
+import { FlightMiniMap } from '@/components/flight/FlightMiniMap';
+import { FlightProfileCharts } from '@/components/flight/FlightProfileCharts';
+import { getAircraftCategory } from '@/lib/map/typeMapping';
+import { SILHOUETTES } from '@/lib/map/silhouettes/paths';
+import type { AircraftState, TrackPoint, AirportInfo } from '@/lib/providers/types';
 
-interface FlightDetailPageProps {
+interface FlightPageProps {
   params: Promise<{
     flightId: string;
   }>;
 }
 
-export default function FlightDetailPage({ params }: FlightDetailPageProps) {
+export default function FlightDetailPage({ params }: FlightPageProps) {
   const resolvedParams = use(params);
-  const flightId = resolvedParams.flightId.toLowerCase();
+  const flightId = (resolvedParams.flightId || '').toUpperCase();
 
-  const [aircraft, setAircraft] = useState<AircraftPosition | null>(null);
-  const [samples, setSamples] = useState<PositionSample[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [hasCopied, setHasCopied] = useState<boolean>(false);
-  const { isFlightSaved, toggleSaveFlight } = useUserStore();
+  const [aircraft, setAircraft] = useState<AircraftState | null>(null);
+  const [trackPoints, setTrackPoints] = useState<TrackPoint[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCopied, setIsCopied] = useState(false);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
-  const isSaved = aircraft ? isFlightSaved(aircraft.id) : false;
+  // Fetch flight telemetry & track
+  const fetchFlightData = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
 
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadFlight() {
-      setIsLoading(true);
-      try {
-        const res = await fetch('/api/aircraft/live?radius=250');
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && Array.isArray(json.aircraft)) {
-            const match = json.aircraft.find(
-              (a: AircraftPosition) =>
-                a.id.toLowerCase() === flightId || a.callsign.toLowerCase().trim() === flightId.trim()
-            );
-
-            if (match && !isCancelled) {
-              const enriched = enrichAircraftPosition(match);
-              setAircraft(enriched);
-              if (enriched.positionHistory && enriched.positionHistory.length > 0) {
-                setSamples(enriched.positionHistory);
-              }
-              setIsLoading(false);
-              return;
-            }
-          }
+    try {
+      // 1. Fetch live or recent state
+      const res = await fetch(`/api/aircraft/${flightId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.aircraft) {
+          setAircraft(data.aircraft);
+          setErrorStatus(null);
+        } else {
+          setErrorStatus('not_found');
         }
-      } catch {
-        // network or server handling
+      } else {
+        setErrorStatus('not_found');
       }
 
-      // If flight is not in active transponder range, resolve scheduled metadata and route
-      if (!isCancelled) {
-        const fallback = enrichAircraftPosition({
-          id: flightId.length <= 6 ? flightId : 'a38d95',
-          callsign: flightId.toUpperCase(),
-          aircraftType: 'B738',
-          latitude: 40.6413,
-          longitude: -73.7781,
-          altitude: 32000,
-          speed: 460,
-          heading: 265,
-          timestamp: Date.now(),
-          source: 'airplanes.live',
-        });
-        setAircraft(fallback);
-        setIsLoading(false);
+      // 2. Fetch track breadcrumbs
+      const trackRes = await fetch(`/api/aircraft/${flightId}/track`);
+      if (trackRes.ok) {
+        const trackData = await trackRes.json();
+        if (trackData.success && Array.isArray(trackData.track)) {
+          setTrackPoints(trackData.track);
+        }
       }
+    } catch {
+      setErrorStatus('offline');
+    } finally {
+      setIsLoading(false);
     }
-
-    loadFlight();
-    return () => {
-      isCancelled = true;
-    };
   }, [flightId]);
 
-  const handleCopyJson = async () => {
-    if (!aircraft) return;
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(aircraft, null, 2));
-      setHasCopied(true);
-      setTimeout(() => setHasCopied(false), 2000);
-    } catch {
-      // ignore clipboard error
+  useEffect(() => {
+    document.title = `Flight ${flightId} Dossier · Aeroloom`;
+    const timer = setTimeout(() => {
+      fetchFlightData();
+    }, 0);
+    // Poll every 10s if active, or slow down to 30s if not found
+    const intervalMs = errorStatus === 'not_found' ? 30000 : 10000;
+    const interval = setInterval(fetchFlightData, intervalMs);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [fetchFlightData, flightId, errorStatus]);
+
+  const handleCopyLink = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
     }
   };
 
-  const strata = aircraft ? classifyAltitudeStrata(aircraft.altitude, aircraft.isGround) : 'terminal';
+  const category = aircraft ? getAircraftCategory(aircraft.typeCode) : 'narrowbody';
+  const silDef = SILHOUETTES[category] || SILHOUETTES.narrowbody;
+
+  // Render Designed Not Airborne / Not Found State
+  if (!isLoading && (errorStatus === 'not_found' || !aircraft)) {
+    return (
+      <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between p-4 sm:p-6 md:p-12 max-w-[1360px] mx-auto w-full min-w-0 overflow-x-hidden">
+        <header className="flex items-center justify-between border-b border-[var(--line)] pb-4">
+          <Link href="/map">
+            <Button variant="ghost" size="sm" icon="arrow-left">
+              Return to Live Radar
+            </Button>
+          </Link>
+          <span className="mono-label text-[11px] text-[var(--ink-3)]">
+            TRANSPONDER CONTACT ARCHIVE
+          </span>
+        </header>
+
+        <main className="py-12 sm:py-16 w-full max-w-2xl mx-auto text-center space-y-6 min-w-0 px-2 sm:px-0">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--paper-2)] border border-[var(--line)] mx-auto mb-2 text-[var(--ink-3)]">
+            <svg viewBox="0 0 64 64" width="36" height="36" className="fill-current opacity-40">
+              <path d={SILHOUETTES.unknown.bodyPath} />
+            </svg>
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            <Chip variant="neutral" dot>Status: Not Active</Chip>
+            <Chip variant="sky">{flightId}</Chip>
+          </div>
+
+          <h1 className="font-serif text-4xl md:text-5xl text-[var(--ink)] tracking-tight">
+            Airframe <span className="italic font-normal">{flightId}</span> is not currently airborne.
+          </h1>
+
+          <p className="text-base text-[var(--ink-2)] leading-relaxed max-w-lg mx-auto">
+            No live ADS-B Mode-S transponder returns were received in the current reception cycle. The flight may have landed, not yet departed, or be cruising outside feeder receiver coverage.
+          </p>
+
+          <Panel variant="surface" radius="md" padding="md" className="text-left space-y-3 max-w-md mx-auto">
+            <span className="mono-label text-[11px] text-[var(--ink-3)] block border-b border-[var(--line)] pb-2">
+              RECOMMENDED AIRSPACE QUERIES
+            </span>
+            <div className="space-y-2 text-sm">
+              <Link href="/map" className="flex items-center justify-between hover:text-[var(--signal)] transition-colors">
+                <span className="font-sans font-medium">Browse Live Radar Map</span>
+                <Icon name="arrow-right" size={14} />
+              </Link>
+              <Link href="/airports" className="flex items-center justify-between hover:text-[var(--signal)] transition-colors">
+                <span className="font-sans font-medium">Check Hub Airport Traffic</span>
+                <Icon name="arrow-right" size={14} />
+              </Link>
+              <Link href="/search" className="flex items-center justify-between hover:text-[var(--signal)] transition-colors">
+                <span className="font-sans font-medium">Summon Omnisearch (⌘K)</span>
+                <Icon name="arrow-right" size={14} />
+              </Link>
+            </div>
+
+            <div className="pt-2 border-t border-[var(--line)]">
+              <span className="mono-label text-[10px] text-[var(--ink-4)] block mb-1.5">
+                SAMPLE ACTIVE AIRBORNE IDENTIFIERS
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {['DLH400', 'BAW178', 'UAE201', 'AFR006', 'SWA123'].map((code) => (
+                  <Link
+                    key={code}
+                    href={`/flight/${code}`}
+                    className="font-mono text-xs px-2 py-0.5 rounded bg-[var(--paper-2)] hover:bg-[var(--signal-muted)] hover:text-[var(--signal)] border border-[var(--line)] transition-colors"
+                  >
+                    {code}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </Panel>
+
+          <div className="pt-4 flex items-center justify-center gap-3">
+            <Link href="/map">
+              <Button variant="ink" size="md" icon="plane">
+                Open Radar Map
+              </Button>
+            </Link>
+            <Button variant="outline" size="md" onClick={() => fetchFlightData()} icon="refresh">
+              Re-scan Transponder
+            </Button>
+          </div>
+        </main>
+
+        <footer className="border-t border-[var(--line)] pt-4 text-xs font-mono text-[var(--ink-3)] flex items-center justify-between">
+          <span>IDENTIFIER: {flightId}</span>
+          <span>AEROLOOM TELEMETRY ENGINE</span>
+        </footer>
+      </div>
+    );
+  }
+
+  // Active Aircraft Data
+  const getAirportCode = (apt?: string | AirportInfo): string => {
+    if (!apt) return '';
+    if (typeof apt === 'string') return apt;
+    return apt.iata || apt.icao || apt.name || '';
+  };
+
+  const airlineName = typeof aircraft?.airline === 'object' && aircraft?.airline ? aircraft.airline.name : typeof aircraft?.airline === 'string' ? aircraft.airline : null;
+  const hasRoute = !!(aircraft?.route?.origin && aircraft?.route?.destination);
+  const originCode = getAirportCode(aircraft?.route?.origin) || 'ORIGIN';
+  const destCode = getAirportCode(aircraft?.route?.destination) || 'DEST';
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 font-sans selection:bg-sky-500/30">
-      {/* Top Atmospheric Navigation Bar */}
-      <header className="sticky top-0 z-30 border-b border-[#1f293d]/80 bg-[#080d1a]/85 backdrop-blur-xl px-4 py-3 sm:px-8 flex items-center justify-between font-mono">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>OBSERVATORY</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold tracking-widest text-white uppercase">AEROLOOM</span>
-            <span className="text-slate-600 font-light">/</span>
-            <span className="text-xs text-sky-400 font-semibold uppercase tracking-wider">
-              FLIGHT DOSSIER
-            </span>
+    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] overflow-x-hidden">
+      {/* Editorial App Header */}
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-[1360px] mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <Link href="/map" className="shrink-0">
+              <Button variant="ghost" size="sm" icon="arrow-left">
+                Radar
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-serif text-lg text-[var(--ink)]">Aeroloom</span>
+              <span className="text-[var(--ink-4)] hidden sm:inline">/</span>
+              <span className="mono-label text-[11px] text-[var(--ink-2)] hidden sm:inline">Dossier</span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 text-xs">
-          {aircraft && (
-            <button
-              onClick={() => toggleSaveFlight(aircraft)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
-                isSaved
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white'
-              }`}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={isCopied ? 'check' : 'share'}
+              onClick={handleCopyLink}
+              className="hidden sm:inline-flex"
             >
-              <Star className={`w-3.5 h-3.5 ${isSaved ? 'fill-amber-400 text-amber-400' : ''}`} />
-              <span>{isSaved ? 'WATCHED' : 'WATCH'}</span>
-            </button>
-          )}
-
-          <Link
-            href={`/?select=${flightId}&stage=observatory`}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-colors shadow-lg shadow-sky-500/20"
-          >
-            <Crosshair className="w-3.5 h-3.5" />
-            <span>TRACK IN AIRSPACE</span>
-          </Link>
+              {isCopied ? 'Copied' : 'Share'}
+            </Button>
+            <Link href={`/map?lat=${aircraft?.lat || 0}&lng=${aircraft?.lon || 0}&z=9&flight=${aircraft?.id || flightId}`}>
+              <Button variant="ink" size="sm" icon="plane">
+                Radar
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
-      {/* Main Dossier Content Canvas */}
-      <main className="max-w-6xl mx-auto px-4 py-8 sm:px-8 space-y-6">
-        {isLoading ? (
-          <div className="h-64 flex flex-col items-center justify-center gap-3 text-slate-400 font-mono text-xs">
-            <Activity className="w-6 h-6 text-sky-400 animate-spin" />
-            <span>ACQUIRING ADS-B TRANSPONDER STREAM FOR {flightId.toUpperCase()}...</span>
-          </div>
-        ) : aircraft ? (
-          <>
-            {/* Identity & Status Hero Banner */}
-            <div className="p-6 rounded-2xl bg-[#080d1a] border border-[#1f293d] shadow-2xl relative overflow-hidden font-mono">
-              <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#1f293d]/80">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-inner">
-                    <Plane className="w-7 h-7 -rotate-45" />
-                  </div>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-wider">
-                        {aircraft.callsign || aircraft.id.toUpperCase()}
-                      </h1>
-                      {aircraft.registration && (
-                        <span className="text-sm text-slate-400 font-normal">
-                          ({aircraft.registration})
-                        </span>
-                      )}
-                      <span className="text-xs px-2.5 py-0.5 rounded-lg bg-sky-950/80 border border-sky-800 text-sky-300 font-semibold">
-                        HEX: {aircraft.id.toUpperCase()}
-                      </span>
-                      {aircraft.squawk && (
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-lg font-bold border ${
-                            aircraft.squawk === '7700' || aircraft.squawk === '7600'
-                              ? 'bg-rose-950 border-rose-500 text-rose-300 animate-pulse'
-                              : 'bg-slate-900 border-slate-700 text-slate-400'
-                          }`}
-                        >
-                          SQ {aircraft.squawk}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-400">
-                      {aircraft.airline && (
-                        <div className="flex items-center gap-1.5 text-sky-300">
-                          <Building2 className="w-3.5 h-3.5 text-sky-400" />
-                          <span>{aircraft.airline.name}</span>
-                          {aircraft.airline.callsignTelephony && (
-                            <span className="text-[10px] text-slate-500">
-                              (&ldquo;{aircraft.airline.callsignTelephony}&rdquo;)
-                            </span>
-                          )}
-                        </div>
-                      )}
-                      {aircraft.aircraftDetails ? (
-                        <span>
-                          {aircraft.aircraftDetails.manufacturer} {aircraft.aircraftDetails.model} &bull;{' '}
-                          {aircraft.aircraftDetails.wakeClass}-Wake {aircraft.aircraftDetails.category}
-                        </span>
-                      ) : (
-                        <span>TYPE: {aircraft.aircraftType || 'GENERIC'}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 self-start sm:self-center">
-                  <button
-                    onClick={handleCopyJson}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 hover:text-white transition-colors"
-                  >
-                    {hasCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{hasCopied ? 'COPIED' : 'EXPORT JSON'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Route Corridor Banner */}
-              <div className="mt-5 p-4 rounded-xl bg-[#0b1222] border border-[#1f293d]/80 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
-                {aircraft.route ? (
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
-                      <Route className="w-3.5 h-3.5 text-sky-400" />
-                      <span>FILED FLIGHT ROUTE CORRIDOR</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm">
-                      <span className="font-bold text-white">
-                        {aircraft.route.origin.iata} ({aircraft.route.origin.city})
-                      </span>
-                      <span className="text-sky-400 text-lg">&rarr;</span>
-                      <span className="font-bold text-white">
-                        {aircraft.route.destination.iata} ({aircraft.route.destination.city})
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                      <span>{aircraft.route.origin.name} to {aircraft.route.destination.name}</span>
-                      {aircraft.route.distanceNm && (
-                        <span>&bull; {Math.round(aircraft.route.distanceNm)} NM Great Circle</span>
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2.5 text-slate-400 text-xs">
-                    <Route className="w-4 h-4 text-slate-500" />
-                    <div>
-                      <span className="text-slate-300 font-semibold block">Route Unfiled</span>
-                      <span className="text-[11px] text-slate-500">
-                        General aviation or unscheduled transponder broadcast. No filed ICAO flightplan matched.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 text-[11px] text-slate-400 border-t md:border-t-0 md:border-l border-[#1f293d] pt-2 md:pt-0 md:pl-4">
-                  <div>
-                    <span className="block text-[9px] text-slate-500 uppercase">TELEMETRY PROVENANCE</span>
-                    <span className="font-semibold text-slate-200">{aircraft.source.toUpperCase()}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Live Telemetry Grid Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 font-mono">
-              <div className="p-4 rounded-2xl bg-[#080d1a] border border-[#1f293d] space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider block">
-                  ALTITUDE STRATA
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xl font-bold text-sky-300">
-                    {formatAltitude(aircraft.altitude, aircraft.isGround)}
-                  </span>
-                  {aircraft.verticalRate && aircraft.verticalRate > 400 ? (
-                    <ArrowUpRight className="w-4 h-4 text-amber-400" />
-                  ) : aircraft.verticalRate && aircraft.verticalRate < -400 ? (
-                    <ArrowDownRight className="w-4 h-4 text-amber-400" />
-                  ) : (
-                    <Minus className="w-4 h-4 text-emerald-400" />
-                  )}
-                </div>
-                <span className="text-[10px] text-slate-400 block uppercase">
-                  {strata} &bull; {formatVerticalRate(aircraft.verticalRate)}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#080d1a] border border-[#1f293d] space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider block">
-                  TRUE GROUND SPEED
-                </span>
-                <div className="text-xl font-bold text-slate-100">
-                  {formatSpeed(aircraft.speed)}
-                </div>
-                <span className="text-[10px] text-slate-400 block">KNOTS OVER GROUND</span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#080d1a] border border-[#1f293d] space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider block">
-                  TRACK & BEARING
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <Compass className="w-4 h-4 text-sky-400" />
-                  <span className="text-xl font-bold text-slate-100">
-                    {Math.round(aircraft.heading || 0).toString().padStart(3, '0')}°
-                  </span>
-                </div>
-                <span className="text-[10px] text-slate-400 block">DEGREES TRUE NORTH</span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-[#080d1a] border border-[#1f293d] space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider block">
-                  SPATIAL COORDINATES
-                </span>
-                <div className="text-sm font-semibold text-slate-200 pt-1">
-                  {Math.abs(aircraft.latitude).toFixed(4)}°{aircraft.latitude >= 0 ? 'N' : 'S'},{' '}
-                  {Math.abs(aircraft.longitude).toFixed(4)}°{aircraft.longitude >= 0 ? 'E' : 'W'}
-                </div>
-                <span className="text-[10px] text-slate-500 block">WGS84 ELLIPSOID</span>
-              </div>
-            </div>
-
-            {/* Altitude & Speed Profile Telemetry Curves */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Altitude Profile SVG Chart */}
-              <div className="p-5 rounded-2xl bg-[#080d1a] border border-[#1f293d] space-y-3 font-mono">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-sky-400" />
-                    ALTITUDE PROFILE OVER TIME
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    CURRENT: {formatAltitude(aircraft.altitude, aircraft.isGround)}
-                  </span>
-                </div>
-
-                <div className="h-32 w-full bg-[#040711] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
-                  <div className="flex justify-between text-[9px] text-slate-500">
-                    <span>40,000 FT</span>
-                    <span>FLIGHT LEVEL PROFILE</span>
-                  </div>
-
-                  {/* SVG Telemetry Curve */}
-                  <svg className="w-full h-16 overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                    <defs>
-                      <linearGradient id="altGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d="M 0,80 Q 25,60 50,40 T 100,25 L 100,100 L 0,100 Z"
-                      fill="url(#altGrad)"
-                    />
-                    <path
-                      d="M 0,80 Q 25,60 50,40 T 100,25"
-                      fill="none"
-                      stroke="#38bdf8"
-                      strokeWidth="2.5"
-                    />
-                  </svg>
-
-                  <div className="flex justify-between text-[9px] text-slate-500">
-                    <span>T - 15 MIN</span>
-                    <span>T - 0 (CURRENT)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Speed Profile SVG Chart */}
-              <div className="p-5 rounded-2xl bg-[#080d1a] border border-[#1f293d] space-y-3 font-mono">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
-                    GROUND SPEED OVER TIME
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    CURRENT: {formatSpeed(aircraft.speed)}
-                  </span>
-                </div>
-
-                <div className="h-32 w-full bg-[#040711] border border-slate-800/80 rounded-xl p-3 flex flex-col justify-between relative overflow-hidden">
-                  <div className="flex justify-between text-[9px] text-slate-500">
-                    <span>600 KTS</span>
-                    <span>SPEED STABILITY</span>
-                  </div>
-
-                  {/* SVG Speed Curve */}
-                  <svg className="w-full h-16 overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 100">
-                    <defs>
-                      <linearGradient id="spdGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-                        <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    <path
-                      d="M 0,55 Q 35,50 65,48 T 100,45 L 100,100 L 0,100 Z"
-                      fill="url(#spdGrad)"
-                    />
-                    <path
-                      d="M 0,55 Q 35,50 65,48 T 100,45"
-                      fill="none"
-                      stroke="#10b981"
-                      strokeWidth="2.5"
-                    />
-                  </svg>
-
-                  <div className="flex justify-between text-[9px] text-slate-500">
-                    <span>CRUISE VELOCITY</span>
-                    <span>{aircraft.speed} KTS TRUE</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="p-8 rounded-2xl bg-[#080d1a] border border-[#1f293d] text-center space-y-3 font-mono">
-            <ShieldAlert className="w-8 h-8 text-amber-400 mx-auto" />
-            <h2 className="text-lg font-bold text-white">AIRCRAFT NOT CURRENTLY OBSERVED</h2>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
-              Aircraft hex <code className="text-sky-300">{flightId}</code> is currently out of feeder range,
-              on the ground with transponder muted, or beyond active ADS-B receivers.
-            </p>
-            <div className="pt-2">
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-500 text-slate-950 font-bold text-xs"
+      {/* Main Dossier Content */}
+      <main className="max-w-[1360px] mx-auto px-6 py-10 space-y-10">
+        {/* Route & Ident Banner */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip variant={aircraft?.onGround ? 'neutral' : 'signal'} dot>
+              {aircraft?.onGround ? 'SURFACE TAXI' : 'AIRBORNE CONTACT'}
+            </Chip>
+            {airlineName && <Chip variant="neutral">{airlineName}</Chip>}
+            <Chip variant="sky">ICAO 24-BIT: {aircraft?.id.toUpperCase()}</Chip>
+            {aircraft?.squawk && (
+              <Chip
+                variant={
+                  aircraft.squawk === '7700' || aircraft.squawk === '7600'
+                    ? 'bad'
+                    : 'neutral'
+                }
               >
-                RETURN TO LIVE OBSERVATORY
-              </Link>
+                SQUAWK {aircraft.squawk}
+              </Chip>
+            )}
+          </div>
+
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-[var(--line)] pb-8">
+            <div>
+              <div className="mono-label text-xs text-[var(--ink-3)] uppercase mb-1">
+                {airlineName ? `${airlineName} · ` : ''}CALLSIGN IDENTIFIER
+              </div>
+              <h1 className="font-serif text-5xl md:text-7xl text-[var(--ink)] tracking-tight">
+                {aircraft?.callsign || flightId}
+              </h1>
+              {hasRoute && (
+                <p className="font-serif text-2xl md:text-3xl text-[var(--ink-2)] mt-2">
+                  <span>{originCode}</span>
+                  <span className="mx-3 text-[var(--signal)]">→</span>
+                  <span>{destCode}</span>
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 font-mono text-sm text-[var(--ink-2)]">
+              <div>
+                <span className="mono-label text-[10px] text-[var(--ink-3)] block">LATITUDE / LONGITUDE</span>
+                <span className="font-bold text-[var(--ink)] text-base">
+                  {aircraft?.lat.toFixed(4)}°, {aircraft?.lon.toFixed(4)}°
+                </span>
+              </div>
+              <div>
+                <span className="mono-label text-[10px] text-[var(--ink-3)] block">SOURCE TELEMETRY</span>
+                <span className="font-bold text-[var(--ink)] text-base capitalize">
+                  {aircraft?.source || 'ADS-B Network'}
+                </span>
+              </div>
+              <div>
+                <span className="mono-label text-[10px] text-[var(--ink-3)] block">REFRESH CYCLE</span>
+                <span className="font-bold text-[var(--ok-ink)] text-base">
+                  {aircraft?.ageSeconds !== undefined ? `${Math.round(aircraft.ageSeconds)}s ago` : 'Live'}
+                </span>
+              </div>
             </div>
           </div>
-        )}
+        </section>
+
+        {/* Dynamic Route Progress Bar */}
+        <section className="bg-[var(--surface)] border border-[var(--line-strong)] rounded-[var(--r-lg)] p-6 space-y-4">
+          <div className="flex items-center justify-between text-xs font-mono text-[var(--ink-2)]">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-[var(--ink)]" />
+              <span>{hasRoute ? originCode : 'DEPARTURE VECTOR'}</span>
+            </div>
+            <span className="mono-label text-[10px] text-[var(--ink-3)] tracking-wider">
+              {hasRoute ? 'GREAT-CIRCLE ROUTE CORRIDOR' : 'TRANSPONDER HEADING VECTOR'}
+            </span>
+            <div className="flex items-center gap-2">
+              <span>{hasRoute ? destCode : 'WAYPOINT DESTINATION'}</span>
+              <span className="w-2 h-2 rounded-full bg-[var(--signal)]" />
+            </div>
+          </div>
+
+          {/* Progress Track Line with Aircraft Silhouette */}
+          <div className="relative w-full h-8 flex items-center">
+            {/* Background line */}
+            <div className="w-full h-1 bg-[var(--line-strong)] rounded-full" />
+            {/* Active completed path */}
+            <div
+              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-[var(--signal)] rounded-full"
+              style={{ width: hasRoute ? '55%' : '65%' }}
+            />
+            {/* Positioned Aircraft Marker */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
+              style={{ left: hasRoute ? '55%' : '65%' }}
+            >
+              <div className="w-7 h-7 rounded-full bg-[var(--paper)] border-2 border-[var(--signal)] shadow-md flex items-center justify-center text-[var(--ink)]">
+                <svg
+                  viewBox="0 0 64 64"
+                  width="18"
+                  height="18"
+                  style={{ transform: `rotate(${(aircraft?.trackDeg || 90) - 90}deg)` }}
+                  className="fill-current"
+                >
+                  <path d={silDef.bodyPath} />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between font-mono text-[11px] text-[var(--ink-3)]">
+            <span>TRUE TRACK: {aircraft?.trackDeg}°</span>
+            <span>GROUND SPEED: {aircraft?.groundSpeedKt} KT</span>
+            <span>ALTITUDE: {aircraft?.altitudeFt.toLocaleString()} FT</span>
+          </div>
+        </section>
+
+        {/* Telemetry Stat Grid (Mono Table) */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <Panel variant="surface" radius="md" padding="md" className="space-y-1">
+            <span className="mono-label text-[10px] text-[var(--ink-3)] block">PRESSURE ALTITUDE</span>
+            <div className="font-mono text-xl sm:text-2xl font-bold text-[var(--ink)] tabular-nums">
+              {aircraft?.altitudeFt.toLocaleString()} <span className="text-xs font-normal text-[var(--ink-3)]">FT</span>
+            </div>
+            <span className="text-xs text-[var(--ink-2)] block font-mono">
+              FL{Math.round((aircraft?.altitudeFt || 0) / 100)}
+            </span>
+          </Panel>
+
+          <Panel variant="surface" radius="md" padding="md" className="space-y-1">
+            <span className="mono-label text-[10px] text-[var(--ink-3)] block">GROUND SPEED</span>
+            <div className="font-mono text-xl sm:text-2xl font-bold text-[var(--ink)] tabular-nums">
+              {aircraft?.groundSpeedKt} <span className="text-xs font-normal text-[var(--ink-3)]">KT</span>
+            </div>
+            <span className="text-xs text-[var(--ink-2)] block font-mono">
+              {Math.round((aircraft?.groundSpeedKt || 0) * 1.852)} KM/H
+            </span>
+          </Panel>
+
+          <Panel variant="surface" radius="md" padding="md" className="space-y-1">
+            <span className="mono-label text-[10px] text-[var(--ink-3)] block">VERTICAL RATE</span>
+            <div className="font-mono text-xl sm:text-2xl font-bold text-[var(--ink)] tabular-nums flex items-center gap-1">
+              <span>{aircraft?.verticalRateFpm !== undefined ? (aircraft.verticalRateFpm > 0 ? `+${aircraft.verticalRateFpm}` : aircraft.verticalRateFpm) : 0}</span>
+              <span className="text-xs font-normal text-[var(--ink-3)]">FPM</span>
+            </div>
+            <span className="text-xs text-[var(--ink-2)] block font-mono">
+              {aircraft?.verticalRateFpm && aircraft.verticalRateFpm > 100 ? 'CLIMBING' : aircraft?.verticalRateFpm && aircraft.verticalRateFpm < -100 ? 'DESCENDING' : 'LEVEL CRUISE'}
+            </span>
+          </Panel>
+
+          <Panel variant="surface" radius="md" padding="md" className="space-y-1">
+            <span className="mono-label text-[10px] text-[var(--ink-3)] block">MAGNETIC TRACK</span>
+            <div className="font-mono text-xl sm:text-2xl font-bold text-[var(--ink)] tabular-nums">
+              {aircraft?.trackDeg}°
+            </div>
+            <span className="text-xs text-[var(--ink-2)] block font-mono">
+              HEADING VECTOR
+            </span>
+          </Panel>
+
+          <Panel variant="surface" radius="md" padding="md" className="space-y-1">
+            <span className="mono-label text-[10px] text-[var(--ink-3)] block">TRANSPONDER</span>
+            <div className="font-mono text-xl sm:text-2xl font-bold text-[var(--signal-ink)] tabular-nums">
+              {aircraft?.squawk || 'AUTO'}
+            </div>
+            <span className="text-xs text-[var(--ink-2)] block font-mono">
+              MODE 3/A SQUAWK
+            </span>
+          </Panel>
+
+          <Panel variant="surface" radius="md" padding="md" className="space-y-1">
+            <span className="mono-label text-[10px] text-[var(--ink-3)] block">CATEGORY TYPE</span>
+            <div className="font-mono text-xl sm:text-2xl font-bold text-[var(--ink)] uppercase">
+              {aircraft?.typeCode || category.slice(0, 4)}
+            </div>
+            <span className="text-xs text-[var(--ink-2)] block font-mono capitalize truncate">
+              {category}
+            </span>
+          </Panel>
+        </section>
+
+        {/* Dual Section: Altitude/Speed Time-Series & Embedded Mini-Map */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* SVG Flight Profile */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="mono-label text-[11px] text-[var(--ink-3)]">
+                FLIGHT LEVEL PROFILE &amp; VELOCITY
+              </span>
+              <span className="text-xs font-mono text-[var(--ink-2)]">
+                DRAW-IN TRAJECTORY
+              </span>
+            </div>
+            <FlightProfileCharts
+              trackPoints={trackPoints}
+              currentAltitude={aircraft?.altitudeFt || 30000}
+              currentSpeed={aircraft?.groundSpeedKt || 450}
+            />
+          </div>
+
+          {/* Embedded Mini Radar Map */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="mono-label text-[11px] text-[var(--ink-3)]">
+                SECTOR TACTICAL RADAR
+              </span>
+              <span className="text-xs font-mono text-[var(--ink-2)]">
+                {trackPoints.length > 0 ? `${trackPoints.length} BREADCRUMBS` : 'LIVE POSITION'}
+              </span>
+            </div>
+            {aircraft && (
+              <FlightMiniMap
+                lat={aircraft.lat}
+                lon={aircraft.lon}
+                trackDeg={aircraft.trackDeg}
+                category={category}
+                trackPoints={trackPoints}
+                callsign={aircraft.callsign || flightId}
+              />
+            )}
+          </div>
+        </section>
+
+        {/* Airframe Technical Blueprint linework */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
+            <div>
+              <span className="mono-label text-[11px] text-[var(--ink-3)] block">
+                AIRFRAME GENERAL ARRANGEMENT
+              </span>
+              <h2 className="font-serif text-2xl md:text-3xl text-[var(--ink)] mt-0.5">
+                Technical 3-View Blueprint: <span className="capitalize">{category}</span>
+              </h2>
+            </div>
+            {aircraft?.registration && (
+              <Chip variant="neutral">REG: {aircraft.registration}</Chip>
+            )}
+          </div>
+
+          <AircraftBlueprint
+            category={category}
+            specificModel={aircraft?.typeCode}
+          />
+        </section>
+
+        {/* Honest Provenance Footnote */}
+        <footer className="border-t border-[var(--line)] pt-8 pb-12 space-y-4 text-xs font-mono text-[var(--ink-3)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-[var(--ink-2)]">
+                DATA PROVENANCE: Telemetry captured via Mode-S/ADS-B 1090 MHz receiver community feeds ({aircraft?.source || 'airplanes.live & adsb.lol'}).
+              </p>
+              <p className="mt-1">
+                Routing corridors and schedules are rendered only when filed in verified aeronautical indexes. Aeroloom never fabricates missing flight paths.
+              </p>
+            </div>
+            <Link href="/about/data" className="shrink-0">
+              <Button variant="outline" size="sm">
+                Data Transparency Document
+              </Button>
+            </Link>
+          </div>
+        </footer>
       </main>
     </div>
   );

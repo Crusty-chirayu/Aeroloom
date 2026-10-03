@@ -14,11 +14,25 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     "public/**",
     "scripts/**",
+    "docs/**",
   ]),
   {
+    plugins: {
+      "react-hooks": nextVitals[0].plugins["react-hooks"],
+    },
     rules: {
       "react-hooks/set-state-in-effect": "warn",
       "react-hooks/refs": "warn",
+      // Interface-required parameters that are intentionally unused in local implementations
+      // are prefixed with _ by convention. Do not flag them.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
     },
   },
 ]);

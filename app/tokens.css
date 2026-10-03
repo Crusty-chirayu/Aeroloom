@@ -1,0 +1,90 @@
+/* ==========================================================================
+   AEROLOOM — DESIGN TOKENS
+   Editorial Aviation design language. All values from DESIGN_SPEC.md §3.
+   Single source of truth. Never put raw values in components.
+   ========================================================================== */
+
+:root {
+  /* ---------- Surfaces ---------- */
+  --paper:        #F6F4EF;  /* page background, warm off-white */
+  --paper-2:      #EFECE4;  /* recessed areas */
+  --surface:      #FFFFFF;  /* cards, panels */
+  --surface-2:    #FBFAF7;  /* hover / secondary surface */
+
+  /* ---------- Ink (typography) ---------- */
+  --ink:          #0E1116;  /* primary text */
+  --ink-2:        #3B4250;  /* secondary text */
+  --ink-3:        #525A69;  /* tertiary / meta (WCAG AA compliant >= 6:1 on --paper) */
+  --ink-4:        #78808E;  /* subtle captions / disabled */
+
+  /* ---------- Lines / Borders ---------- */
+  --line:         rgba(14, 17, 22, 0.08);
+  --line-strong:  rgba(14, 17, 22, 0.16);
+
+  /* ---------- Brand Signal — vermilion ---------- */
+  --signal:       #FF4F1F;  /* primary accent, selected aircraft */
+  --signal-cta:   #D33A0E;  /* WCAG AA compliant CTA background (4.6:1 against #FFF) */
+  --signal-ink:   #B32E0A;  /* WCAG AA compliant accent text (>= 5:1 on light backgrounds) */
+  --signal-wash:  #FFE9E1;  /* accent tint backgrounds */
+
+  /* ---------- Sky (secondary — altitude / data) ---------- */
+  --sky:          #2B62F0;
+  --sky-wash:     #E6EDFF;
+
+  /* ---------- Status ---------- */
+  --ok:           #1F9D6B;
+  --ok-ink:       #116943;  /* WCAG AA text variant on light paper/surface (>= 5.5:1) */
+  --warn:         #E8A317;
+  --warn-ink:     #8A5200;  /* WCAG AA text variant */
+  --bad:          #D64545;
+  --bad-ink:      #A82525;  /* WCAG AA text variant */
+
+  /* ---------- Altitude ramp for trails / markers (low → high) ---------- */
+  --alt-0: #FF4F1F;
+  --alt-1: #F5A524;
+  --alt-2: #7BC96F;
+  --alt-3: #2FB7C9;
+  --alt-4: #2B62F0;
+  --alt-5: #6B3FD1;
+
+  /* ---------- Border radius ---------- */
+  --r-sm:   8px;
+  --r-md:   14px;
+  --r-lg:   22px;
+  --r-pill: 999px;
+
+  /* ---------- Shadows (only these three — no big grey blurs) ---------- */
+  --sh-1: 0 1px 0 rgba(14, 17, 22, .04), 0 1px 2px rgba(14, 17, 22, .06);
+  --sh-2: 0 1px 0 rgba(14, 17, 22, .04), 0 8px 24px -8px rgba(14, 17, 22, .14);
+  --sh-3: 0 24px 64px -24px rgba(14, 17, 22, .28);
+
+  /* ---------- Motion easing ---------- */
+  --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out:    cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ---------- Durations ---------- */
+  --dur-micro: 150ms;
+  --dur-ui:    280ms;
+  --dur-reveal: 800ms;
+
+  /* ---------- Layout ---------- */
+  --max-w:    1360px;
+  --gutter:   clamp(20px, 4vw, 64px);
+
+  /* ---------- Typography scale ---------- */
+  --text-display-xl: clamp(96px, 14vw, 200px);
+  --text-display-l:  clamp(64px, 9vw, 112px);
+  --text-h1:         clamp(40px, 5vw, 56px);
+  --text-h2:         clamp(28px, 3.5vw, 36px);
+  --text-body:       16px;
+  --text-small:      14px;
+  --text-micro:      12px;
+
+  /* leading */
+  --leading-display: 0.92;
+  --leading-body:    1.55;
+
+  /* tracking */
+  --tracking-display: -0.03em;
+  --tracking-label:   0.06em;   /* mono uppercase labels */
+}

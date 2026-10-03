@@ -615,3 +615,8 @@ export const persistenceAdapter: IPersistenceAdapter =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     ? new CloudPersistenceAdapter()
     : new LocalDevicePersistenceAdapter();
+
+export function getPersistenceAdapter(): IPersistenceAdapter {
+  return persistenceAdapter;
+}
+

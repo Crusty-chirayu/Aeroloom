@@ -1,276 +1,455 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { use, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import {
-  Building2,
-  ArrowLeft,
-  MapPin,
-  Compass,
-  Crosshair,
-  Plane,
-  Activity,
-  Layers,
-  ExternalLink,
-  ShieldAlert,
-} from 'lucide-react';
-import {
-  getAirportByIata,
-  getAirportByIcao,
-  calculateDistanceNm,
-} from '@/lib/airports/airportData';
-import type { AircraftPosition, AirportInfo } from '@/lib/providers/positions/types';
-import { formatAltitude, formatSpeed } from '@/lib/map/aircraftGeoJson';
-import { enrichAircraftPositions } from '@/lib/providers/enrichment';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { Panel } from '@/components/ui/Panel';
+import { Icon } from '@/components/ui/Icon';
+import { getAirportByIata, getAirportByIcao } from '@/lib/airports/airportData';
+import { AirportTerminalMap } from '@/components/airport/AirportTerminalMap';
+import { MetarWeatherCard } from '@/components/airport/MetarWeatherCard';
+import { AirportRadarScope } from '@/components/airport/AirportRadarScope';
+import { AirportRadarScopeBentoTile } from '@/components/airport/AirportRadarScopeBentoTile';
+import { AuthUserMenu } from '@/components/user/AuthUserMenu';
+import { AskAeroloomPanel } from '@/components/assistant/AskAeroloomPanel';
+import type { AircraftState, WeatherReport } from '@/lib/providers/types';
 
-interface AirportDetailPageProps {
+interface AirportPageProps {
   params: Promise<{
     code: string;
   }>;
 }
 
-export default function AirportDetailPage({ params }: AirportDetailPageProps) {
+export default function AirportDetailPage({ params }: AirportPageProps) {
   const resolvedParams = use(params);
-  const code = resolvedParams.code.toUpperCase();
+  const code = (resolvedParams.code || '').toUpperCase();
 
-  const airport: AirportInfo | undefined =
-    getAirportByIata(code) || getAirportByIcao(code);
+  const airport = getAirportByIata(code) || getAirportByIcao(code);
 
-  const [nearbyAircraft, setNearbyAircraft] = useState<
-    Array<AircraftPosition & { distanceToAirportNm: number }>
-  >([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [weather, setWeather] = useState<WeatherReport | null>(null);
+  const [traffic, setTraffic] = useState<AircraftState[]>([]);
+  const [isLoadingWeather, setIsLoadingWeather] = useState(true);
+  const [isLoadingTraffic, setIsLoadingTraffic] = useState(true);
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
-  useEffect(() => {
-    if (!airport) {
-      setIsLoading(false);
-      return;
-    }
+  // Fetch METAR weather and nearby traffic
+  const fetchAirportData = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    if (!airport) return;
 
-    let isCancelled = false;
-
-    async function loadNearbyTraffic() {
-      setIsLoading(true);
-      try {
-        const url = `/api/aircraft/live?lat=${airport?.latitude.toFixed(4)}&lon=${airport?.longitude.toFixed(4)}&radius=60`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.success && Array.isArray(json.aircraft)) {
-            const enriched = enrichAircraftPositions(json.aircraft);
-            const withDist = enriched
-              .map((ac) => {
-                const dist = calculateDistanceNm(
-                  airport!.latitude,
-                  airport!.longitude,
-                  ac.latitude,
-                  ac.longitude
-                );
-                return { ...ac, distanceToAirportNm: Math.round(dist) };
-              })
-              .sort((a, b) => a.distanceToAirportNm - b.distanceToAirportNm);
-
-            if (!isCancelled) {
-              setNearbyAircraft(withDist);
-              setIsLoading(false);
-            }
-            return;
-          }
+    // 1. Fetch weather
+    try {
+      const wRes = await fetch(`/api/airport/${airport.icao}/weather`);
+      if (wRes.ok) {
+        const wData = await wRes.json();
+        if (wData.success && wData.weather) {
+          setWeather(wData.weather);
         }
-      } catch {
-        // error handling
       }
-
-      if (!isCancelled) {
-        setIsLoading(false);
-      }
+    } catch {
+      // Degraded weather
+    } finally {
+      setIsLoadingWeather(false);
     }
 
-    loadNearbyTraffic();
-    return () => {
-      isCancelled = true;
-    };
+    // 2. Fetch traffic
+    try {
+      const tRes = await fetch(`/api/airport/${airport.icao}/traffic`);
+      if (tRes.ok) {
+        const tData = await tRes.json();
+        if (tData.success && Array.isArray(tData.aircraft)) {
+          setTraffic(tData.aircraft);
+        }
+      }
+    } catch {
+      // Degraded traffic
+    } finally {
+      setIsLoadingTraffic(false);
+    }
   }, [airport]);
 
+  useEffect(() => {
+    if (airport) {
+      document.title = `${airport.name} (${airport.iata} / ${airport.icao}) · Aeroloom`;
+    } else {
+      document.title = `Airport ${code} · Aeroloom`;
+    }
+    const timer = setTimeout(() => {
+      fetchAirportData();
+    }, 0);
+    const interval = setInterval(fetchAirportData, 10000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [fetchAirportData, airport, code]);
+
+  // Update local clock based on longitude estimate (or UTC)
+  useEffect(() => {
+    if (!airport) return;
+    const updateClock = () => {
+      const now = new Date();
+      // Estimate UTC offset hours from longitude
+      const offsetHours = Math.round(airport.longitude / 15);
+      const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+      const localDate = new Date(utcMs + 3600000 * offsetHours);
+      setCurrentTime(
+        localDate.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        })
+      );
+    };
+
+    updateClock();
+    const clockInterval = setInterval(updateClock, 1000);
+    return () => clearInterval(clockInterval);
+  }, [airport]);
+
+  // Designed Error / Not Found State
   if (!airport) {
     return (
-      <div className="min-h-screen bg-[#030712] text-slate-100 font-mono p-8 flex flex-col items-center justify-center space-y-4">
-        <ShieldAlert className="w-10 h-10 text-rose-400" />
-        <h1 className="text-xl font-bold">AIRPORT CODE &ldquo;{code}&rdquo; NOT RECOGNIZED</h1>
-        <p className="text-xs text-slate-400">
-          The requested identifier was not found in the curated open airport dataset.
-        </p>
-        <Link
-          href="/airports"
-          className="px-4 py-2 rounded-xl bg-sky-500 text-slate-950 font-bold text-xs"
-        >
-          RETURN TO AIRPORT DIRECTORY
-        </Link>
+      <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)] flex flex-col justify-between p-6 md:p-12 max-w-[1360px] mx-auto">
+        <header className="flex items-center justify-between border-b border-[var(--line)] pb-4">
+          <Link href="/airports">
+            <Button variant="ghost" size="sm" icon="arrow-left">
+              Airports Directory
+            </Button>
+          </Link>
+          <span className="mono-label text-[11px] text-[var(--ink-3)]">
+            AERODROME CATALOGUE
+          </span>
+        </header>
+
+        <main className="py-16 max-w-xl mx-auto text-center space-y-6">
+          <Chip variant="bad">Unrecognized Aerodrome</Chip>
+          <h1 className="font-serif text-4xl md:text-5xl text-[var(--ink)]">
+            Airport Code &ldquo;{code}&rdquo; Not Found
+          </h1>
+          <p className="text-base text-[var(--ink-2)] leading-relaxed">
+            The code entered does not match an indexed IATA or ICAO aerodrome station in Aeroloom&apos;s verified global directory.
+          </p>
+
+          <div className="pt-2 flex justify-center gap-3">
+            <Link href="/airports">
+              <Button variant="ink" size="md" icon="compass">
+                Browse All Hubs
+              </Button>
+            </Link>
+            <Link href="/map">
+              <Button variant="outline" size="md" icon="radar">
+                Live Radar Map
+              </Button>
+            </Link>
+          </div>
+        </main>
+
+        <footer className="border-t border-[var(--line)] pt-4 text-xs font-mono text-[var(--ink-3)] text-center">
+          AEROLOOM AVIATION REPOSITORY · STANDARDS ISO 3166 / ICAO DOC 7910
+        </footer>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 font-sans selection:bg-sky-500/30">
-      {/* Sticky Top Header */}
-      <header className="sticky top-0 z-30 border-b border-[#1f293d]/80 bg-[#080d1a]/85 backdrop-blur-xl px-4 py-3 sm:px-8 flex items-center justify-between font-mono">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/airports"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>ALL AIRPORTS</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold tracking-widest text-white uppercase">AEROLOOM</span>
-            <span className="text-slate-600 font-light">/</span>
-            <span className="text-xs text-sky-400 font-semibold uppercase tracking-wider">
-              {airport.iata} TERMINAL AIRSPACE
-            </span>
+    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+      {/* Editorial App Header */}
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-[1360px] mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <Link href="/airports" className="shrink-0">
+              <Button variant="ghost" size="sm" icon="arrow-left">
+                Airports
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-serif text-lg text-[var(--ink)]">Aeroloom</span>
+              <span className="text-[var(--ink-4)] hidden sm:inline">/</span>
+              <span className="mono-label text-[11px] text-[var(--ink-2)] hidden sm:inline">Airport</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setAssistantOpen(true)}
+              className="text-xs font-mono px-2.5 py-1.5 rounded-sm border border-[var(--signal)]/30 text-[var(--signal-ink)] bg-[var(--signal-wash)] hover:bg-[var(--signal-wash)]/80 flex items-center gap-1.5 transition-colors"
+              title="Ask Aeroloom Grounded AI"
+            >
+              <Icon name="radar" size={14} className="text-[var(--signal)]" />
+              <span>Ask AI</span>
+            </button>
+            <Link href={`/map?lat=${airport.latitude}&lng=${airport.longitude}&z=10`}>
+              <Button variant="ink" size="sm" icon="plane">
+                Radar
+              </Button>
+            </Link>
+            <AuthUserMenu />
           </div>
         </div>
-
-        <Link
-          href="/"
-          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-colors shadow-lg shadow-sky-500/20 font-mono"
-        >
-          <Crosshair className="w-3.5 h-3.5" />
-          <span>VIEW IN OBSERVATORY</span>
-        </Link>
       </header>
 
-      {/* Main Terminal Dossier */}
-      <main className="max-w-6xl mx-auto px-4 py-8 sm:px-8 space-y-6">
-        {/* Airport Identity Card */}
-        <div className="p-6 rounded-2xl bg-[#080d1a] border border-[#1f293d] shadow-2xl relative overflow-hidden font-mono">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-sky-500/5 rounded-full blur-3xl pointer-events-none" />
+      {/* Main Content */}
+      <main className="max-w-[1360px] mx-auto px-6 py-10 space-y-10">
+        {/* Aerodrome Identity Header */}
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <Chip variant="signal">INTERNATIONAL AERODROME</Chip>
+            <Chip variant="neutral">{airport.country}</Chip>
+            {weather?.flightCategory && (
+              <Chip
+                variant={
+                  weather.flightCategory === 'VFR'
+                    ? 'ok'
+                    : weather.flightCategory === 'MVFR'
+                    ? 'sky'
+                    : weather.flightCategory === 'IFR'
+                    ? 'warn'
+                    : 'bad'
+                }
+                dot
+              >
+                {weather.flightCategory} CONDITIONS
+              </Chip>
+            )}
+          </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#1f293d]/80">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-inner">
-                <Building2 className="w-7 h-7" />
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 border-b border-[var(--line)] pb-8">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <span className="font-mono text-3xl md:text-4xl font-bold text-[var(--ink)]">
+                  {airport.iata}
+                </span>
+                <span className="font-mono text-lg px-2 py-0.5 rounded-[var(--r-sm)] bg-[var(--paper-2)] border border-[var(--line)] text-[var(--ink-2)]">
+                  {airport.icao}
+                </span>
               </div>
-              <div>
-                <div className="flex items-center gap-2.5">
-                  <h1 className="text-3xl font-bold text-white tracking-wider">
-                    {airport.iata}
-                  </h1>
-                  <span className="text-sm px-2.5 py-0.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
-                    ICAO: {airport.icao}
-                  </span>
-                </div>
-                <h2 className="text-base text-slate-200 font-semibold mt-1 font-sans">
-                  {airport.name}
-                </h2>
-                <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                  <span>{airport.city}, {airport.country}</span>
-                  {airport.timezone && <span>&bull; {airport.timezone}</span>}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col items-end gap-1 text-xs text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-sky-400" />
-                {airport.latitude.toFixed(4)}°, {airport.longitude.toFixed(4)}°
-              </span>
-              {airport.elevationFt && (
-                <span>ELEVATION: {airport.elevationFt.toLocaleString()} FT MSL</span>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400">
-            <span className="text-[11px] text-slate-500">
-              Coverage radius: 60 Nautical Miles &bull; Observed airborne transponder telemetry
-            </span>
-            <span className="px-2 py-0.5 rounded bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-[10px]">
-              {nearbyAircraft.length} AIRCRAFT WITHIN 60 NM
-            </span>
-          </div>
-        </div>
-
-        {/* Nearby Observed Airspace Section */}
-        <div className="space-y-3 font-mono">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Plane className="w-4 h-4 text-sky-400" />
-              <span>NEARBY OBSERVED TRAFFIC ({nearbyAircraft.length})</span>
-            </h3>
-            <span className="text-[10px] text-slate-500">
-              LIVE ADS-B FEED (SORTED BY PROXIMITY)
-            </span>
-          </div>
-
-          {isLoading ? (
-            <div className="h-48 flex items-center justify-center gap-2 text-xs text-slate-400">
-              <Activity className="w-5 h-5 text-sky-400 animate-spin" />
-              <span>SCANNING RADAR SECTOR AROUND {airport.iata}...</span>
-            </div>
-          ) : nearbyAircraft.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {nearbyAircraft.map((ac) => (
-                <div
-                  key={ac.id}
-                  className="p-4 rounded-xl bg-[#080d1a] border border-[#1f293d] hover:border-sky-500/40 transition-all flex flex-col justify-between gap-3 group"
-                >
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-white tracking-wider group-hover:text-sky-300 transition-colors">
-                        {ac.callsign || ac.id.toUpperCase()}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-950/80 border border-sky-800 text-sky-300 font-semibold">
-                        {ac.distanceToAirportNm} NM
-                      </span>
-                    </div>
-
-                    {ac.airline && (
-                      <span className="text-[11px] text-sky-400 font-semibold block truncate">
-                        {ac.airline.name}
-                      </span>
-                    )}
-
-                    <div className="flex items-center gap-3 text-xs text-slate-300 pt-1">
-                      <span>{formatAltitude(ac.altitude, ac.isGround)}</span>
-                      <span>&bull;</span>
-                      <span>{formatSpeed(ac.speed)}</span>
-                      <span>&bull;</span>
-                      <span>{ac.aircraftType || 'GEN'}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-[#1f293d]/60 text-xs">
-                    <Link
-                      href={`/flight/${ac.id}`}
-                      className="text-[11px] text-slate-400 hover:text-white transition-colors flex items-center gap-1"
-                    >
-                      <span>DOSSIER</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
-
-                    <Link
-                      href={`/?select=${ac.id}&stage=observatory`}
-                      className="text-[11px] font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1"
-                    >
-                      <Crosshair className="w-3 h-3" />
-                      <span>TRACK</span>
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="p-8 rounded-2xl bg-[#080d1a] border border-[#1f293d] text-center space-y-2">
-              <Plane className="w-8 h-8 text-slate-600 mx-auto" />
-              <p className="text-sm font-bold text-slate-300">NO AIRCRAFT WITHIN 60 NM RADAR</p>
-              <p className="text-xs text-slate-500">
-                No active airborne transponders detected in the immediate terminal sector.
+              <h1 className="font-serif text-4xl md:text-6xl text-[var(--ink)] tracking-tight">
+                {airport.name}
+              </h1>
+              <p className="font-sans text-base text-[var(--ink-2)] mt-1">
+                Serving {airport.city}, {airport.country}
               </p>
             </div>
-          )}
-        </div>
+
+            {/* Aerodrome Coordinates & Clock */}
+            <div className="flex flex-wrap items-center gap-6 font-mono text-sm text-[var(--ink-2)]">
+              {currentTime && (
+                <div>
+                  <span className="mono-label text-[10px] text-[var(--ink-3)] block">EST. LOCAL TIME</span>
+                  <span className="font-bold text-[var(--ink)] text-base tabular-nums">
+                    {currentTime}
+                  </span>
+                </div>
+              )}
+              <div>
+                <span className="mono-label text-[10px] text-[var(--ink-3)] block">FIELD ELEVATION</span>
+                <span className="font-bold text-[var(--ink)] text-base">
+                  {airport.elevationFt !== undefined ? `${airport.elevationFt} FT MSL` : 'SEA LEVEL'}
+                </span>
+              </div>
+              <div>
+                <span className="mono-label text-[10px] text-[var(--ink-3)] block">COORDINATES</span>
+                <span className="font-bold text-[var(--ink)] text-base">
+                  {airport.latitude.toFixed(4)}°, {airport.longitude.toFixed(4)}°
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Live Weather Section */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="mono-label text-[11px] text-[var(--ink-3)]">
+              METEOROLOGICAL CONDITIONS (METAR)
+            </span>
+            <span className="text-xs font-mono text-[var(--ink-2)]">
+              NOAA / AVIATIONWEATHER.GOV
+            </span>
+          </div>
+
+          <MetarWeatherCard weather={weather} isLoading={isLoadingWeather} />
+        </section>
+
+        {/* ATC Radar Scope Section */}
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="mono-label text-[11px] text-[var(--ink-3)]">
+              AIR TRAFFIC CONTROL (ATC) RADAR SCOPE
+            </span>
+            <span className="text-xs font-mono text-[var(--ink-2)]">
+              PRIMARY / SECONDARY SURVEILLANCE RADAR
+            </span>
+          </div>
+
+          <AirportRadarScope
+            airport={airport}
+            aircraft={traffic}
+            isLoading={isLoadingTraffic}
+          />
+        </section>
+
+        {/* Dual Section: Terminal Radar Map & Bento Tile Preview */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          {/* Map Column */}
+          <div className="lg:col-span-7 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="mono-label text-[11px] text-[var(--ink-3)]">
+                TERMINAL MANEUVERING AREA (30 NM TMA)
+              </span>
+              <span className="text-xs font-mono text-[var(--ink-2)]">
+                {traffic.length} AIRCRAFT TRACKED
+              </span>
+            </div>
+
+            <AirportTerminalMap airport={airport} aircraft={traffic} />
+          </div>
+
+          {/* Traffic & Bento Column */}
+          <div className="lg:col-span-5 space-y-6">
+            <AirportRadarScopeBentoTile
+              airport={airport}
+              traffic={traffic}
+            />
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="mono-label text-[11px] text-[var(--ink-3)]">
+                  AIRCRAFT NEAR THIS AIRPORT
+                </span>
+                <span className="text-xs font-mono text-[var(--ink-2)]">
+                  WITHIN 35 NM
+                </span>
+              </div>
+
+              <Panel variant="surface" radius="md" padding="md" className="space-y-4 max-h-[320px] overflow-y-auto">
+                {isLoadingTraffic ? (
+                  <div className="space-y-3 animate-pulse py-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="h-10 bg-[var(--paper-2)] rounded" />
+                    ))}
+                  </div>
+                ) : traffic.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-[var(--paper-2)] flex items-center justify-center mx-auto text-[var(--ink-3)]">
+                      <Icon name="radar" size={18} />
+                    </div>
+                    <div className="font-serif text-lg text-[var(--ink)]">Clear Airspace</div>
+                    <p className="text-xs text-[var(--ink-3)] max-w-xs mx-auto">
+                      No transponder-equipped aircraft currently detected within 35 nautical miles of {airport.iata}.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[var(--line)]">
+                    {traffic.slice(0, 10).map((ac) => (
+                      <Link
+                        key={ac.id}
+                        href={`/flight/${ac.callsign.toLowerCase()}`}
+                        className="py-2.5 flex items-center justify-between hover:bg-[var(--paper-2)] px-2 -mx-2 rounded transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-7 h-7 rounded-full bg-[var(--paper-2)] group-hover:bg-[var(--paper)] flex items-center justify-center text-[var(--ink)] border border-[var(--line)]">
+                            <Icon name="plane" size={14} />
+                          </div>
+                          <div>
+                            <div className="font-mono text-sm font-bold text-[var(--ink)] group-hover:text-[var(--signal)] transition-colors">
+                              {ac.callsign}
+                            </div>
+                            <div className="text-[11px] font-mono text-[var(--ink-3)]">
+                              {ac.typeCode || 'AIRCRAFT'} · {typeof ac.airline === 'object' && ac.airline ? ac.airline.name : ac.airline || 'Commercial'}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right font-mono text-xs">
+                          <div className="font-semibold text-[var(--ink)]">
+                            {ac.altitudeFt.toLocaleString()} FT
+                          </div>
+                          <div className="text-[11px] text-[var(--ink-3)]">
+                            {ac.groundSpeedKt} KT · {ac.trackDeg}°
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </Panel>
+            </div>
+          </div>
+        </section>
+
+        {/* Airport Operational & Physical Specifications */}
+        <section className="space-y-4">
+          <span className="mono-label text-[11px] text-[var(--ink-3)] block border-b border-[var(--line)] pb-2">
+            AERODROME PHYSICAL SPECIFICATIONS &amp; WAYPOINTS
+          </span>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Panel variant="surface" radius="md" padding="md">
+              <span className="mono-label text-[10px] text-[var(--ink-3)] block">IATA / ICAO</span>
+              <span className="font-mono text-xl font-bold text-[var(--ink)]">
+                {airport.iata} / {airport.icao}
+              </span>
+              <span className="text-[11px] font-mono text-[var(--ink-3)] block mt-0.5">ICAO DOC 7910</span>
+            </Panel>
+
+            <Panel variant="surface" radius="md" padding="md">
+              <span className="mono-label text-[10px] text-[var(--ink-3)] block">GEOGRAPHIC LATITUDE</span>
+              <span className="font-mono text-xl font-bold text-[var(--ink)]">
+                {airport.latitude.toFixed(4)}°
+              </span>
+              <span className="text-[11px] font-mono text-[var(--ink-3)] block mt-0.5">WGS-84 ELLIPSOID</span>
+            </Panel>
+
+            <Panel variant="surface" radius="md" padding="md">
+              <span className="mono-label text-[10px] text-[var(--ink-3)] block">GEOGRAPHIC LONGITUDE</span>
+              <span className="font-mono text-xl font-bold text-[var(--ink)]">
+                {airport.longitude.toFixed(4)}°
+              </span>
+              <span className="text-[11px] font-mono text-[var(--ink-3)] block mt-0.5">PRIME MERIDIAN</span>
+            </Panel>
+
+            <Panel variant="surface" radius="md" padding="md">
+              <span className="mono-label text-[10px] text-[var(--ink-3)] block">AERODROME ELEVATION</span>
+              <span className="font-mono text-xl font-bold text-[var(--ink)]">
+                {airport.elevationFt ?? 0} FT
+              </span>
+              <span className="text-[11px] font-mono text-[var(--ink-3)] block mt-0.5">MEAN SEA LEVEL (MSL)</span>
+            </Panel>
+          </div>
+        </section>
+
+        {/* Honest Provenance Footnote */}
+        <footer className="border-t border-[var(--line)] pt-8 pb-12 space-y-4 text-xs font-mono text-[var(--ink-3)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-[var(--ink-2)]">
+                HONEST TELEMETRY NOTICE: Aeroloom displays live transponder aircraft within terminal control airspace. Scheduled airline arrivals and departures boards are omitted because no free, verified public API exists without fake data.
+              </p>
+              <p className="mt-1">
+                Meteorological data sourced directly from NOAA aviationweather.gov.
+              </p>
+            </div>
+            <Link href="/about/data" className="shrink-0">
+              <Button variant="outline" size="sm">
+                Data Transparency
+              </Button>
+            </Link>
+          </div>
+        </footer>
       </main>
+
+      {/* Ask Aeroloom Grounded AI Assistant */}
+      <AskAeroloomPanel
+        isOpen={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        contextHint={{ airportIcao: airport.icao }}
+      />
     </div>
   );
 }

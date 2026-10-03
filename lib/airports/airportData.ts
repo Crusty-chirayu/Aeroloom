@@ -474,6 +474,18 @@ export const GLOBAL_AIRPORTS: AirportInfo[] = [
     elevationFt: 5558,
     timezone: 'Africa/Johannesburg',
   },
+  // --- INDIA & SOUTH ASIA ---
+  {
+    icao: 'VOBL',
+    iata: 'BLR',
+    name: 'Kempegowda International Airport',
+    city: 'Bengaluru',
+    country: 'India',
+    latitude: 13.1986,
+    longitude: 77.7066,
+    elevationFt: 3000,
+    timezone: 'Asia/Kolkata',
+  },
 ];
 
 // In-memory index maps for O(1) lookups

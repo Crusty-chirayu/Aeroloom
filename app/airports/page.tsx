@@ -2,191 +2,235 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import {
-  Building2,
-  Search,
-  ArrowLeft,
-  MapPin,
-  Compass,
-  Crosshair,
-  ExternalLink,
-  Plane,
-} from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Chip';
+import { Input } from '@/components/ui/Input';
 import { GLOBAL_AIRPORTS } from '@/lib/airports/airportData';
-import type { AirportInfo } from '@/lib/providers/positions/types';
+
+// Map country to broad global regions
+function getRegion(country: string, icao: string): string {
+  const code = icao.toUpperCase();
+  if (code.startsWith('K') || code.startsWith('C') || country.includes('United States') || country.includes('Canada') || country.includes('Mexico') || country.includes('Brazil')) {
+    return 'Americas';
+  }
+  if (code.startsWith('E') || code.startsWith('L') || country.includes('United Kingdom') || country.includes('France') || country.includes('Germany') || country.includes('Netherlands') || country.includes('Spain') || country.includes('Italy') || country.includes('Switzerland')) {
+    return 'Europe';
+  }
+  if (code.startsWith('O') || country.includes('United Arab Emirates') || country.includes('Qatar') || country.includes('Saudi Arabia') || country.includes('South Africa') || country.includes('Egypt')) {
+    return 'Middle East & Africa';
+  }
+  return 'Asia-Pacific';
+}
 
 export default function AirportsDirectoryPage() {
   const [search, setSearch] = useState('');
-  const [selectedCountry, setSelectedCountry] = useState<string>('ALL');
+  const [selectedRegion, setSelectedRegion] = useState<string>('ALL');
 
-  // Extract unique countries
-  const countries = useMemo(() => {
-    const set = new Set<string>();
-    GLOBAL_AIRPORTS.forEach((a) => {
-      if (a.country) set.add(a.country);
-    });
-    return Array.from(set).sort();
-  }, []);
-
-  // Filtered airports
   const filteredAirports = useMemo(() => {
     const term = search.trim().toUpperCase();
     return GLOBAL_AIRPORTS.filter((a) => {
-      const matchCountry = selectedCountry === 'ALL' || a.country === selectedCountry;
-      if (!matchCountry) return false;
+      const region = getRegion(a.country, a.icao);
+      const matchRegion = selectedRegion === 'ALL' || region === selectedRegion;
+      if (!matchRegion) return false;
 
       if (!term) return true;
       return (
         a.iata.toUpperCase().includes(term) ||
         a.icao.toUpperCase().includes(term) ||
         a.name.toUpperCase().includes(term) ||
-        a.city.toUpperCase().includes(term)
+        a.city.toUpperCase().includes(term) ||
+        a.country.toUpperCase().includes(term)
       );
     });
-  }, [search, selectedCountry]);
+  }, [search, selectedRegion]);
+
+  const regions = ['ALL', 'Americas', 'Europe', 'Asia-Pacific', 'Middle East & Africa'];
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 font-sans selection:bg-sky-500/30">
-      {/* Sticky Atmospheric Header */}
-      <header className="sticky top-0 z-30 border-b border-[#1f293d]/80 bg-[#080d1a]/85 backdrop-blur-xl px-4 py-3 sm:px-8 flex items-center justify-between font-mono">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 hover:text-white hover:border-slate-600 transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>OBSERVATORY</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold tracking-widest text-white uppercase">AEROLOOM</span>
-            <span className="text-slate-600 font-light">/</span>
-            <span className="text-xs text-sky-400 font-semibold uppercase tracking-wider">
-              AIRPORT DIRECTORY
-            </span>
+    <div className="min-h-screen bg-[var(--paper)] text-[var(--ink)]">
+      {/* Editorial App Header */}
+      <header className="sticky top-0 z-30 border-b border-[var(--line)] bg-[var(--paper)]/90 backdrop-blur-md px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-[1360px] mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <Link href="/map" className="shrink-0">
+              <Button variant="ghost" size="sm" icon="arrow-left">
+                Map
+              </Button>
+            </Link>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="font-serif text-lg text-[var(--ink)]">Aeroloom</span>
+              <span className="text-[var(--ink-4)] hidden sm:inline">/</span>
+              <span className="mono-label text-[11px] text-[var(--ink-2)] hidden sm:inline">Airports</span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Link href="/search" className="hidden sm:inline-flex">
+              <Button variant="outline" size="sm" icon="search">
+                Search
+              </Button>
+            </Link>
+            <Link href="/map">
+              <Button variant="ink" size="sm" icon="plane">
+                Radar
+              </Button>
+            </Link>
           </div>
         </div>
-
-        <Link
-          href="/dashboard"
-          className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-semibold text-slate-300 hover:text-white transition-colors"
-        >
-          DASHBOARD
-        </Link>
       </header>
 
-      {/* Main Directory Body */}
-      <main className="max-w-6xl mx-auto px-4 py-8 sm:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 font-mono">
+      {/* Main Content */}
+      <main className="max-w-[1360px] mx-auto px-6 py-10 space-y-8">
+        {/* Title & Description */}
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 border-b border-[var(--line)] pb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-wide flex items-center gap-2.5">
-              <Building2 className="w-7 h-7 text-sky-400" />
-              GLOBAL AVIATION HUBS
+            <div className="mono-label text-xs text-[var(--ink-3)] uppercase mb-1">
+              AERONAUTICAL WAYPOINT DIRECTORY
+            </div>
+            <h1 className="font-serif text-4xl md:text-5xl text-[var(--ink)] tracking-tight">
+              Global Aerodromes &amp; Gateways
             </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Curated international gateways, metropolitan corridors, and regional airspaces ({filteredAirports.length} indexed).
+            <p className="text-sm text-[var(--ink-2)] mt-2 max-w-xl">
+              Verified aeronautical coordinates, field elevations, and terminal control sectors for major international hubs ({filteredAirports.length} displayed).
             </p>
           </div>
-
           <div className="flex items-center gap-2">
-            <span className="text-xs px-2.5 py-1 rounded-lg bg-sky-950/80 border border-sky-800/80 text-sky-300">
-              ZERO-API CACHED DATASET
-            </span>
+            <Chip variant="neutral" dot>{GLOBAL_AIRPORTS.length} Indexed Stations</Chip>
           </div>
         </div>
 
-        {/* Search & Country Filter Controls */}
-        <div className="p-4 rounded-2xl bg-[#080d1a] border border-[#1f293d] flex flex-col sm:flex-row gap-3 font-mono text-xs">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-sky-400 absolute left-3 top-2.5" />
-            <input
-              type="text"
-              placeholder="Search by IATA, ICAO, name, or city (e.g. JFK, EGLL, Tokyo)..."
+        {/* Filters Toolbar */}
+        <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+          {/* Search Input */}
+          <div className="w-full md:max-w-md">
+            <Input
+              icon="search"
+              placeholder="Search by IATA, ICAO, city, or name..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-[#040711] border border-slate-800 text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500/60"
+              clearable
+              onClear={() => setSearch('')}
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <select
-              value={selectedCountry}
-              onChange={(e) => setSelectedCountry(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-[#040711] border border-slate-800 text-slate-200 focus:outline-none focus:border-sky-500/60"
-            >
-              <option value="ALL">All Countries ({countries.length})</option>
-              {countries.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+          {/* Region Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-[var(--r-md)] bg-[var(--surface)] border border-[var(--line)]">
+            {regions.map((reg) => (
+              <button
+                key={reg}
+                type="button"
+                onClick={() => setSelectedRegion(reg)}
+                className={`px-3 py-1.5 rounded-[var(--r-sm)] font-mono text-xs transition-colors ${
+                  selectedRegion === reg
+                    ? 'bg-[var(--paper)] text-[var(--ink)] shadow-sm font-semibold border border-[var(--line)]'
+                    : 'text-[var(--ink-2)] hover:text-[var(--ink)]'
+                }`}
+              >
+                {reg === 'ALL' ? 'All Regions' : reg}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Airport Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 font-mono">
-          {filteredAirports.map((airport) => (
-            <div
-              key={airport.icao}
-              className="p-5 rounded-2xl bg-[#080d1a] border border-[#1f293d] hover:border-sky-500/50 transition-all flex flex-col justify-between gap-4 group"
-            >
-              <div className="space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl font-bold text-white group-hover:text-sky-300 transition-colors">
-                        {airport.iata}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300">
-                        {airport.icao}
-                      </span>
-                    </div>
-                    <span className="text-xs text-sky-400 font-semibold block mt-0.5">
-                      {airport.city}, {airport.country}
-                    </span>
-                  </div>
+        {/* Clean Typographic Table */}
+        <div className="rounded-[var(--r-md)] border border-[var(--line-strong)] bg-[var(--paper)] overflow-hidden shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--line-strong)] bg-[var(--surface)] text-[var(--ink-3)] font-mono text-[10px] tracking-wider uppercase">
+                  <th className="py-3 px-4 sm:px-6">CODE</th>
+                  <th className="py-3 px-4 sm:px-6">AERODROME &amp; METROPOLITAN AREA</th>
+                  <th className="py-3 px-4 sm:px-6 hidden sm:table-cell">REGION / COUNTRY</th>
+                  <th className="py-3 px-4 sm:px-6 hidden md:table-cell">COORDINATES</th>
+                  <th className="py-3 px-4 sm:px-6 hidden lg:table-cell">ELEVATION</th>
+                  <th className="py-3 px-4 sm:px-6 text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)] text-sm font-sans">
+                {filteredAirports.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-[var(--ink-3)] font-mono text-xs">
+                      No aerodromes found matching &ldquo;{search}&rdquo;.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAirports.map((apt) => {
+                    const region = getRegion(apt.country, apt.icao);
+                    return (
+                      <tr
+                        key={apt.icao}
+                        className="hover:bg-[var(--paper-2)] transition-colors group"
+                      >
+                        {/* Code */}
+                        <td className="py-3 px-4 sm:px-6 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-base font-bold text-[var(--ink)] group-hover:text-[var(--signal)] transition-colors">
+                              {apt.iata}
+                            </span>
+                            <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-[var(--paper-2)] border border-[var(--line)] text-[var(--ink-3)]">
+                              {apt.icao}
+                            </span>
+                          </div>
+                        </td>
 
-                  <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
-                    <Building2 className="w-4 h-4" />
-                  </div>
-                </div>
+                        {/* Station Name & City */}
+                        <td className="py-3 px-4 sm:px-6">
+                          <Link
+                            href={`/airport/${apt.iata.toLowerCase()}`}
+                            className="block font-medium text-[var(--ink)] hover:underline"
+                          >
+                            {apt.name}
+                          </Link>
+                          <span className="text-xs text-[var(--ink-2)] block sm:hidden">
+                            {apt.city}, {apt.country}
+                          </span>
+                        </td>
 
-                <p className="text-xs text-slate-300 font-sans line-clamp-1">
-                  {airport.name}
-                </p>
+                        {/* Region & Country */}
+                        <td className="py-3 px-4 sm:px-6 hidden sm:table-cell whitespace-nowrap text-xs text-[var(--ink-2)]">
+                          <div>{apt.city}, {apt.country}</div>
+                          <span className="font-mono text-[10px] text-[var(--ink-3)]">{region}</span>
+                        </td>
 
-                <div className="pt-2 border-t border-[#1f293d]/80 flex items-center justify-between text-[10px] text-slate-400">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-slate-500" />
-                    {airport.latitude.toFixed(3)}°, {airport.longitude.toFixed(3)}°
-                  </span>
-                  {airport.elevationFt && (
-                    <span>ELEV: {airport.elevationFt.toLocaleString()} FT</span>
-                  )}
-                </div>
-              </div>
+                        {/* Coordinates */}
+                        <td className="py-3 px-4 sm:px-6 hidden md:table-cell whitespace-nowrap font-mono text-xs text-[var(--ink-2)]">
+                          {apt.latitude.toFixed(2)}°, {apt.longitude.toFixed(2)}°
+                        </td>
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#1f293d]/60 text-xs">
-                <Link
-                  href={`/airport/${airport.iata.toLowerCase()}`}
-                  className="flex-1 py-1.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-center transition-colors flex items-center justify-center gap-1"
-                >
-                  <ExternalLink className="w-3 h-3" />
-                  <span>DETAILS</span>
-                </Link>
+                        {/* Elevation */}
+                        <td className="py-3 px-4 sm:px-6 hidden lg:table-cell whitespace-nowrap font-mono text-xs text-[var(--ink-2)]">
+                          {apt.elevationFt !== undefined ? `${apt.elevationFt} FT` : '—'}
+                        </td>
 
-                <Link
-                  href={`/?stage=observatory&select=${airport.iata.toLowerCase()}`}
-                  className="flex-1 py-1.5 px-3 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-300 text-center transition-colors flex items-center justify-center gap-1 font-semibold"
-                >
-                  <Crosshair className="w-3 h-3" />
-                  <span>RADAR</span>
-                </Link>
-              </div>
-            </div>
-          ))}
+                        {/* Actions */}
+                        <td className="py-3 px-4 sm:px-6 text-right whitespace-nowrap">
+                          <div className="inline-flex items-center gap-2">
+                            <Link href={`/airport/${apt.iata.toLowerCase()}`}>
+                              <Button variant="ghost" size="sm">
+                                Dossier
+                              </Button>
+                            </Link>
+                            <Link href={`/map?lat=${apt.latitude}&lng=${apt.longitude}&z=10`}>
+                              <Button variant="outline" size="sm" icon="radar">
+                                Radar
+                              </Button>
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* Directory Metadata Footer */}
+        <footer className="border-t border-[var(--line)] pt-6 text-xs font-mono text-[var(--ink-3)] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>STANDARDS: ICAO DOC 7910 · WGS-84 GEODETIC DATUM</div>
+          <div>AEROLOOM AERODROME REPOSITORY</div>
+        </footer>
       </main>
     </div>
   );

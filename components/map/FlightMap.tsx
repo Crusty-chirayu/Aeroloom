@@ -1,415 +1,644 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  Map as MapLibreMap,
-  NavigationControl,
-  ScaleControl,
-  FullscreenControl,
-  setWorkerUrl,
-  type ErrorEvent,
-} from 'maplibre-gl';
-import { BASEMAP_PROVIDERS, AVIATION_SECTORS, MAP_DEFAULTS, type AviationSector } from '@/lib/map/config';
+import React, { useEffect, useRef, useState } from 'react';
+import { Map as MapLibreMap, setWorkerUrl, type GeoJSONSource } from 'maplibre-gl';
+import { AEROLOOM_LIGHT_MAP_STYLE } from '@/lib/map/mapStyle';
+import { registerAllAircraftSprites, getAircraftSpriteId } from '@/lib/map/spriteAtlas';
+import { computeDayNightTerminator } from '@/lib/map/dayNightTerminator';
+import type { AircraftState, Bounds } from '@/lib/providers/types';
+import type { AircraftInterpolator, RenderedAircraft } from '@/lib/map/interpolation';
+import type { PositionSample } from '@/lib/providers/positions/types';
+import type { MapFilters, MapLayers } from './MapControls';
+import { MapHoverTag } from './MapHoverTag';
+import { mapTypeCodeToCategory } from '@/lib/map/typeMapping';
 
-// Configure MapLibre Web Worker static URL for Turbopack/Next.js environment
-if (typeof window !== 'undefined') {
-  setWorkerUrl('/maplibre-gl-worker.mjs');
-}
-import { AlertCircle, RefreshCw, Layers, Compass, Loader2 } from 'lucide-react';
-
-export interface MapMetrics {
-  lng: number;
-  lat: number;
-  zoom: number;
-  pitch: number;
-  bearing: number;
+function clampLat(lat: number): number {
+  return Math.max(-89.9, Math.min(89.9, lat));
 }
 
-interface FlightMapProps {
-  activeSector?: AviationSector;
-  providerKey?: 'cartoDark' | 'openFreeMapDark';
-  onSectorChange?: (sector: AviationSector) => void;
-  onMetricsChange?: (metrics: MapMetrics) => void;
-  onMapReady?: (map: MapLibreMap) => void;
-  children?: (map: MapLibreMap | null) => React.ReactNode;
+function normalizeLng(lng: number): number {
+  let val = ((lng + 180) % 360);
+  if (val < 0) val += 360;
+  return val - 180;
 }
 
-export default function FlightMap({
-  activeSector = MAP_DEFAULTS.initialSector,
-  providerKey,
-  onSectorChange,
-  onMetricsChange,
-  onMapReady,
-  children,
+export interface FlightMapProps {
+  interpolator: AircraftInterpolator;
+  selectedAircraftId: string | null;
+  selectedTrail: PositionSample[];
+  isFollowMode: boolean;
+  onSelectAircraft: (id: string | null) => void;
+  onExitFollow: () => void;
+  onBoundsChange: (bounds: Bounds, zoom: number) => void;
+  initialCenter?: [number, number]; // [lng, lat]
+  initialZoom?: number;
+  filters: MapFilters;
+  layers: MapLayers;
+  radarTileUrl?: string | null;
+  radarOpacity?: number;
+  className?: string;
+}
+
+export function FlightMap({
+  interpolator,
+  selectedAircraftId,
+  selectedTrail,
+  isFollowMode,
+  onSelectAircraft,
+  onExitFollow,
+  onBoundsChange,
+  initialCenter = [-73.78, 40.64], // Default JFK
+  initialZoom = 8,
+  filters,
+  layers,
+  radarTileUrl = null,
+  radarOpacity = 0.7,
+  className = '',
 }: FlightMapProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const isMapLoadedRef = useRef<boolean>(false);
+  const rafIdRef = useRef<number | null>(null);
 
-  const [internalProviderKey, setInternalProviderKey] = useState<'cartoDark' | 'openFreeMapDark'>('cartoDark');
-  const activeProviderKey = providerKey || internalProviderKey;
-  const prevProviderKeyRef = useRef<string>(activeProviderKey);
-  const prevSectorIdRef = useRef<string>(activeSector.id);
+  // Hover state
+  const [hoveredAircraft, setHoveredAircraft] = useState<AircraftState | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [basemapUnavailable, setBasemapUnavailable] = useState(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryCountRef = useRef<number>(0);
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [mapError, setMapError] = useState<string | null>(null);
-  const [mapMetrics, setMapMetrics] = useState<MapMetrics>({
-    lng: activeSector.center[0],
-    lat: activeSector.center[1],
-    zoom: activeSector.zoom,
-    pitch: activeSector.pitch,
-    bearing: activeSector.bearing,
-  });
-  const [isMapReady, setIsMapReady] = useState<boolean>(false);
+  // References for values needed in RAF loop to avoid closure capture issues
+  const filtersRef = useRef(filters);
+  const isFollowModeRef = useRef(isFollowMode);
+  const selectedIdRef = useRef(selectedAircraftId);
 
-  const activeProvider = BASEMAP_PROVIDERS[activeProviderKey] || BASEMAP_PROVIDERS.cartoDark;
-  const initialSectorRef = useRef<AviationSector>(activeSector);
-  const onMetricsChangeRef = useRef(onMetricsChange);
-  onMetricsChangeRef.current = onMetricsChange;
-  const onMapReadyRef = useRef(onMapReady);
-  onMapReadyRef.current = onMapReady;
+  useEffect(() => {
+    filtersRef.current = filters;
+    isFollowModeRef.current = isFollowMode;
+    selectedIdRef.current = selectedAircraftId;
+  }, [filters, isFollowMode, selectedAircraftId]);
 
-  // Initialize MapLibre instance once on mount
-  const initMap = useCallback(() => {
+  // 1. Initialize MapLibre GL
+  useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    setIsLoading(true);
-    setMapError(null);
-    setIsMapReady(false);
+    setWorkerUrl('/maplibre-gl-worker.mjs');
+
+    const map = new MapLibreMap({
+      container: containerRef.current,
+      style: AEROLOOM_LIGHT_MAP_STYLE,
+      center: initialCenter,
+      zoom: initialZoom,
+      attributionControl: false,
+      pitchWithRotate: false,
+      dragRotate: false,
+      maxPitch: 0, // Flat tactical view per spec
+      ...({ preserveDrawingBuffer: true } as unknown as Record<string, unknown>),
+    } as unknown as import('maplibre-gl').MapOptions);
+
+    mapRef.current = map;
+    if (typeof window !== 'undefined') {
+      (window as unknown as { _aeroloomMap?: MapLibreMap })._aeroloomMap = map;
+    }
+
+    // Gracefully handle MapLibre errors so failed tile/style fetches never cause uncaught console errors
+    map.on('error', (e) => {
+      const err = e.error as { status?: number; message?: string; url?: string } | undefined;
+      const eventSourceId = (e as unknown as { sourceId?: string }).sourceId;
+      const isTileOrStyle =
+        eventSourceId === 'openmaptiles' ||
+        (err?.url && (err.url.includes('openfreemap') || err.url.includes('rainviewer') || err.url.includes('tilecache'))) ||
+        (err?.message && (err.message.includes('fetch') || err.message.includes('tile') || err.message.includes('AJAXError')));
+
+      if (isTileOrStyle) {
+        setBasemapUnavailable(true);
+
+        // Retry with backoff (3s, 6s, 12s, max 30s)
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+        const backoffMs = Math.min(3000 * Math.pow(2, retryCountRef.current), 30000);
+        retryCountRef.current += 1;
+
+        retryTimeoutRef.current = setTimeout(() => {
+          if (mapRef.current) {
+            try {
+              const src = mapRef.current.getSource('openmaptiles');
+              if (src && 'reload' in src && typeof (src as unknown as { reload: () => void }).reload === 'function') {
+                (src as unknown as { reload: () => void }).reload();
+              }
+            } catch {
+              // Silently ignore reload attempts
+            }
+          }
+        }, backoffMs);
+      }
+    });
+
+    map.on('sourcedata', (e) => {
+      if (e.sourceId === 'openmaptiles' && e.isSourceLoaded) {
+        setBasemapUnavailable(false);
+        retryCountRef.current = 0;
+      }
+    });
+
+    map.on('load', async () => {
+      isMapLoadedRef.current = true;
+
+      // Register custom aviation sprite atlas (66 sprites)
+      await registerAllAircraftSprites(map);
+
+      // Add Day/Night Terminator source and layer
+      try {
+        const terminatorGeoJson = computeDayNightTerminator();
+        map.addSource('terminator', {
+          type: 'geojson',
+          data: terminatorGeoJson,
+        });
+
+        map.addLayer({
+          id: 'terminator-fill',
+          type: 'fill',
+          source: 'terminator',
+          layout: {
+            visibility: layers.terminator ? 'visible' : 'none',
+          },
+          paint: {
+            'fill-color': '#0E1116',
+            'fill-opacity': 0.08,
+          },
+        });
+      } catch (err) {
+        console.warn('Day/night terminator layer setup notice:', err);
+      }
+
+      // Add Weather Radar Raster layer using built-in rainviewer source
+      try {
+        if (!map.getLayer('radar-raster')) {
+          map.addLayer({
+            id: 'radar-raster',
+            type: 'raster',
+            source: 'rainviewer',
+            layout: {
+              visibility: layers.radar ? 'visible' : 'none',
+            },
+            paint: {
+              'raster-opacity': 0.45,
+            },
+          });
+        }
+      } catch (err) {
+        console.warn('Radar layer setup notice:', err);
+      }
+
+      // Add Selected Flight Breadcrumb Trail
+      map.addSource('selected-trail', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'selected-trail-casing',
+        type: 'line',
+        source: 'selected-trail',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': '#FFFFFF',
+          'line-width': 4,
+          'line-opacity': 0.9,
+        },
+      });
+
+      map.addLayer({
+        id: 'selected-trail-line',
+        type: 'line',
+        source: 'selected-trail',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round',
+        },
+        paint: {
+          'line-color': '#FF4F1F',
+          'line-width': 2,
+          'line-dasharray': [2, 1],
+        },
+      });
+
+      // Add Aircraft Ground Shadow source & layer
+      map.addSource('aircraft-shadow', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'aircraft-shadow-layer',
+        type: 'symbol',
+        source: 'aircraft-shadow',
+        layout: {
+          'icon-image': ['get', 'iconImage'],
+          'icon-rotate': ['get', 'bearing'],
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-size': 0.65,
+        },
+        paint: {
+          'icon-opacity': 0.3,
+        },
+      });
+
+      // Add Primary Aircraft layer
+      map.addSource('aircraft', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+
+      map.addLayer({
+        id: 'aircraft-layer',
+        type: 'symbol',
+        source: 'aircraft',
+        layout: {
+          'icon-image': ['get', 'iconImage'],
+          'icon-rotate': ['get', 'bearing'],
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true,
+          'icon-size': 0.65,
+        },
+      });
+
+      // Add Aircraft Callout Labels (zoomed in)
+      map.addLayer({
+        id: 'aircraft-labels',
+        type: 'symbol',
+        source: 'aircraft',
+        minzoom: 8.5,
+        layout: {
+          'text-field': ['get', 'callsign'],
+          'text-font': ['Noto Sans Regular'],
+          'text-size': 10,
+          'text-offset': [0, 1.4],
+          'text-anchor': 'top',
+          'text-allow-overlap': false,
+        },
+        paint: {
+          'text-color': '#0E1116',
+          'text-halo-color': '#FFFFFF',
+          'text-halo-width': 1.5,
+        },
+      });
+
+      // Initial bounds trigger
+      const bounds = map.getBounds();
+      onBoundsChange(
+        {
+          south: bounds.getSouth(),
+          west: bounds.getWest(),
+          north: bounds.getNorth(),
+          east: bounds.getEast(),
+        },
+        map.getZoom()
+      );
+    });
+
+    // Map Interaction Listeners
+    const notifyBounds = () => {
+      if (!map) return;
+      const b = map.getBounds();
+      onBoundsChange(
+        {
+          south: b.getSouth(),
+          west: b.getWest(),
+          north: b.getNorth(),
+          east: b.getEast(),
+        },
+        map.getZoom()
+      );
+    };
+
+    map.on('moveend', notifyBounds);
+    map.on('zoomend', notifyBounds);
+
+    // Disable follow mode on manual drag
+    map.on('dragstart', () => {
+      if (isFollowModeRef.current) {
+        onExitFollow();
+      }
+    });
+
+    // Hover hit testing
+    map.on('mousemove', 'aircraft-layer', (e) => {
+      map.getCanvas().style.cursor = 'pointer';
+      const feature = e.features?.[0];
+      if (feature && feature.properties) {
+        const id = feature.properties.id;
+        interpolator.setHoveredId(id);
+        const ac = interpolator.get(id);
+        if (ac) {
+          setHoveredAircraft(ac.raw);
+          setHoverPos({ x: e.point.x, y: e.point.y });
+        }
+      }
+    });
+
+    map.on('mouseleave', 'aircraft-layer', () => {
+      map.getCanvas().style.cursor = '';
+      interpolator.setHoveredId(null);
+      setHoveredAircraft(null);
+    });
+
+    // Click selection
+    map.on('click', 'aircraft-layer', (e) => {
+      const feature = e.features?.[0];
+      if (feature && feature.properties?.id) {
+        const id = feature.properties.id;
+        onSelectAircraft(id);
+      }
+    });
+
+    map.on('click', (e) => {
+      const features = map.queryRenderedFeatures(e.point, { layers: ['aircraft-layer'] });
+      if (!features || features.length === 0) {
+        onSelectAircraft(null);
+      }
+    });
+
+    return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
+      map.remove();
+      mapRef.current = null;
+      isMapLoadedRef.current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount
+
+  // 2. Layer visibility synchronization & dynamic radar source
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isMapLoadedRef.current) return;
+
+    if (map.getLayer('terminator-fill')) {
+      map.setLayoutProperty('terminator-fill', 'visibility', layers.terminator ? 'visible' : 'none');
+    }
+
+    if (!layers.radar || !radarTileUrl) {
+      if (map.getLayer('radar-raster')) {
+        map.setLayoutProperty('radar-raster', 'visibility', 'none');
+      }
+      return;
+    }
 
     try {
-      const initSector = initialSectorRef.current;
-      const map = new MapLibreMap({
-        container: containerRef.current,
-        style: activeProvider.styleUrl,
-        center: initSector.center,
-        zoom: initSector.zoom,
-        pitch: initSector.pitch,
-        bearing: initSector.bearing,
-        minZoom: MAP_DEFAULTS.minZoom,
-        maxZoom: MAP_DEFAULTS.maxZoom,
-        attributionControl: false,
-        dragRotate: MAP_DEFAULTS.dragRotate,
-        touchPitch: MAP_DEFAULTS.touchPitch,
-      });
-
-      // Add navigation controls (zoom in/out, pitch/compass reset)
-      map.addControl(
-        new NavigationControl({
-          visualizePitch: true,
-          showZoom: true,
-          showCompass: true,
-        }),
-        'bottom-right'
-      );
-
-      // Add nautical scale control
-      map.addControl(
-        new ScaleControl({
-          maxWidth: 120,
-          unit: 'nautical',
-        }),
-        'bottom-left'
-      );
-
-      // Add fullscreen control
-      map.addControl(
-        new FullscreenControl({
-          container: containerRef.current,
-        }),
-        'bottom-right'
-      );
-
-      // Listen to map telemetry / movement
-      const updateMetrics = () => {
-        const center = map.getCenter();
-        const metrics: MapMetrics = {
-          lng: Number(center.lng.toFixed(4)),
-          lat: Number(center.lat.toFixed(4)),
-          zoom: Number(map.getZoom().toFixed(1)),
-          pitch: Number(map.getPitch().toFixed(0)),
-          bearing: Number(map.getBearing().toFixed(0)),
-        };
-        setMapMetrics(metrics);
-        onMetricsChangeRef.current?.(metrics);
-      };
-
-      map.on('move', updateMetrics);
-      map.on('zoom', updateMetrics);
-      map.on('pitch', updateMetrics);
-      map.on('rotate', updateMetrics);
-
-      // Handle map load completion
-      const handleReady = () => {
-        setIsLoading(false);
-        setIsMapReady(true);
-        updateMetrics();
-        if (typeof window !== 'undefined') {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (window as any).__aeroloomMap = map;
+      const source = map.getSource('rainviewer-radar') as unknown as { setTiles: (tiles: string[]) => void } | undefined;
+      if (source && typeof source.setTiles === 'function') {
+        source.setTiles([radarTileUrl]);
+        if (map.getLayer('radar-raster')) {
+          map.setLayoutProperty('radar-raster', 'visibility', 'visible');
+          map.setPaintProperty('radar-raster', 'raster-opacity', radarOpacity);
         }
-        onMapReadyRef.current?.(map);
-      };
-
-      map.on('load', handleReady);
-      map.on('idle', handleReady);
-      map.on('styledata', () => {
-        if (map.isStyleLoaded()) {
-          handleReady();
+      } else {
+        if (map.getLayer('radar-raster')) {
+          map.removeLayer('radar-raster');
         }
-      });
-
-      // Safety fallback: ensure loading overlay clears even on slow network
-      setTimeout(handleReady, 3500);
-
-      // Listen for WebGL context loss on the canvas
-      const canvas = map.getCanvas();
-      const handleContextLost = (e: Event) => {
-        e.preventDefault();
-        setMapError('WebGL Context Lost (GPU reset or background tab). Click Retry Canvas below to restore.');
-        setIsLoading(false);
-      };
-      const handleContextRestored = () => {
-        setMapError(null);
-        setIsLoading(true);
-        map.resize();
-        handleReady();
-      };
-
-      canvas.addEventListener('webglcontextlost', handleContextLost, false);
-      canvas.addEventListener('webglcontextrestored', handleContextRestored, false);
-
-      // Handle tile / style error
-      map.on('error', (e: ErrorEvent) => {
-        if (e.error && (e.error.message.includes('style') || e.error.message.includes('WebGL'))) {
-          setMapError(`Map Engine Alert: ${e.error.message}`);
-          setIsLoading(false);
+        if (map.getSource('rainviewer-radar')) {
+          map.removeSource('rainviewer-radar');
         }
-      });
 
-      mapRef.current = map;
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to initialize WebGL map canvas';
-      setMapError(msg);
-      setIsLoading(false);
+        map.addSource('rainviewer-radar', {
+          type: 'raster',
+          tiles: [radarTileUrl],
+          tileSize: 256,
+          maxzoom: 7,
+        });
+
+        const beforeLayerId = map.getLayer('aeroloom-aircraft-shadows')
+          ? 'aeroloom-aircraft-shadows'
+          : undefined;
+
+        map.addLayer(
+          {
+            id: 'radar-raster',
+            type: 'raster',
+            source: 'rainviewer-radar',
+            layout: {
+              visibility: 'visible',
+            },
+            paint: {
+              'raster-opacity': radarOpacity,
+              'raster-fade-duration': 0,
+            },
+          },
+          beforeLayerId
+        );
+      }
+    } catch (err) {
+      console.warn('Radar layer update notice:', err);
     }
-  }, [activeProvider.styleUrl]);
+  }, [layers.terminator, layers.radar, radarTileUrl, radarOpacity]);
 
-  // Initial mount
+  // 3. Update Selected Trail Line GeoJSON
   useEffect(() => {
-    initMap();
+    const map = mapRef.current;
+    if (!map || !isMapLoadedRef.current) return;
+
+    const trailSource = map.getSource('selected-trail') as GeoJSONSource;
+    if (!trailSource) return;
+
+    if (selectedTrail.length < 2) {
+      trailSource.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+
+    const coordinates = selectedTrail.map((pt) => [pt.longitude, pt.latitude]);
+    trailSource.setData({
+      type: 'FeatureCollection',
+      features: [
+        {
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates,
+          },
+          properties: {},
+        },
+      ],
+    });
+  }, [selectedTrail]);
+
+  // 4. Center Camera on Selected Aircraft
+  const centeredFlightIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    centeredFlightIdRef.current = null;
+  }, [selectedAircraftId]);
+
+  // 5. 60 FPS Dead-Reckoning RAF Loop
+  useEffect(() => {
+    let active = true;
+
+    const loop = (timestamp: number) => {
+      if (!active) return;
+
+      const map = mapRef.current;
+      if (map && isMapLoadedRef.current) {
+        const aircraftSource = map.getSource('aircraft') as GeoJSONSource;
+        const shadowSource = map.getSource('aircraft-shadow') as GeoJSONSource;
+
+        if (aircraftSource && shadowSource) {
+          interpolator.step(Date.now(), (renderedList: RenderedAircraft[]) => {
+            const currentFilters = filtersRef.current;
+            const currentSelectedId = selectedIdRef.current;
+            const currentFollow = isFollowModeRef.current;
+
+            // Filter aircraft based on UI settings
+            const filtered = renderedList.filter((item) => {
+              const ac = item.raw;
+              // Ground filter
+              if (!currentFilters.showGround && ac.onGround) return false;
+
+              // Category filter
+              const category = mapTypeCodeToCategory(ac.typeCode);
+              if (currentFilters.category !== 'all' && category !== currentFilters.category) return false;
+
+              // Altitude filter
+              const alt = ac.altitudeFt ?? 0;
+              if (currentFilters.altitude === 'low' && alt >= 10000) return false;
+              if (currentFilters.altitude === 'med' && (alt < 10000 || alt > 25000)) return false;
+              if (currentFilters.altitude === 'high' && alt <= 25000) return false;
+
+              return true;
+            });
+
+            // Build GeoJSON features for aircraft
+            const aircraftFeatures: GeoJSON.Feature[] = [];
+            const shadowFeatures: GeoJSON.Feature[] = [];
+
+            filtered.forEach((item) => {
+              if (
+                !Number.isFinite(item.currentLat) ||
+                !Number.isFinite(item.currentLng)
+              ) {
+                return;
+              }
+
+              const safeLat = clampLat(item.currentLat);
+              const safeLng = normalizeLng(item.currentLng);
+
+              const ac = item.raw;
+              const category = mapTypeCodeToCategory(ac.typeCode);
+              const spriteId = getAircraftSpriteId(category, item.state);
+
+              aircraftFeatures.push({
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [safeLng, safeLat],
+                },
+                properties: {
+                  id: item.id,
+                  callsign: ac.callsign || ac.id.toUpperCase(),
+                  bearing: item.currentTrack,
+                  iconImage: spriteId,
+                  altitudeFt: ac.altitudeFt,
+                  speedKt: ac.groundSpeedKt,
+                  typeCode: ac.typeCode || 'UNKNOWN',
+                },
+              });
+
+              // Ground shadow offset by altitude (scale: 35,000 ft = ~0.02 deg offset)
+              const shadowSpriteId = getAircraftSpriteId(category, 'ground_shadow');
+              const alt = ac.altitudeFt || 0;
+              const offset = Math.min(0.025, (alt / 35000) * 0.015);
+              const shadowLat = clampLat(safeLat - offset);
+              const shadowLng = normalizeLng(safeLng + offset);
+
+              shadowFeatures.push({
+                type: 'Feature',
+                geometry: {
+                  type: 'Point',
+                  coordinates: [shadowLng, shadowLat],
+                },
+                properties: {
+                  id: `${item.id}-shadow`,
+                  bearing: item.currentTrack,
+                  iconImage: shadowSpriteId,
+                },
+              });
+
+              // Initial smooth centering when an aircraft is first selected or loaded from URL
+              if (currentSelectedId === item.id && centeredFlightIdRef.current !== currentSelectedId) {
+                centeredFlightIdRef.current = currentSelectedId;
+                map.easeTo({
+                  center: [safeLng, safeLat],
+                  duration: 800,
+                  padding: { right: typeof window !== 'undefined' && window.innerWidth > 768 ? 420 : 0 },
+                });
+              }
+
+              // Camera follow lock
+              if (currentFollow && currentSelectedId === item.id) {
+                map.easeTo({
+                  center: [safeLng, safeLat],
+                  duration: 0, // Direct lock
+                });
+              }
+            });
+
+            aircraftSource.setData({
+              type: 'FeatureCollection',
+              features: aircraftFeatures,
+            });
+
+            shadowSource.setData({
+              type: 'FeatureCollection',
+              features: shadowFeatures,
+            });
+          });
+        }
+      }
+
+      rafIdRef.current = requestAnimationFrame(loop);
+    };
+
+    rafIdRef.current = requestAnimationFrame(loop);
 
     return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
+      active = false;
+      if (rafIdRef.current) cancelAnimationFrame(rafIdRef.current);
     };
-  }, [initMap]);
-
-  // Smooth camera navigation on sector change without map destruction
-  useEffect(() => {
-    if (!mapRef.current) return;
-    if (prevSectorIdRef.current === activeSector.id) return;
-    prevSectorIdRef.current = activeSector.id;
-
-    mapRef.current.flyTo({
-      center: activeSector.center,
-      zoom: activeSector.zoom,
-      pitch: activeSector.pitch,
-      bearing: activeSector.bearing,
-      essential: true,
-      duration: 1600,
-    });
-  }, [activeSector]);
-
-  // Dynamic basemap style change without destroying map instance
-  useEffect(() => {
-    if (!mapRef.current) return;
-    if (prevProviderKeyRef.current === activeProviderKey) return;
-    prevProviderKeyRef.current = activeProviderKey;
-
-    const targetProvider = BASEMAP_PROVIDERS[activeProviderKey];
-    if (targetProvider?.styleUrl) {
-      setIsLoading(true);
-      mapRef.current.setStyle(targetProvider.styleUrl);
-    }
-  }, [activeProviderKey]);
-
-  // ResizeObserver for fluid responsive map resizing
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      if (mapRef.current) {
-        mapRef.current.resize();
-      }
-    });
-
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []);
-
-  // Handle programmatic sector navigation
-  const flyToSector = (sector: AviationSector) => {
-    if (!mapRef.current) return;
-
-    mapRef.current.flyTo({
-      center: sector.center,
-      zoom: sector.zoom,
-      pitch: sector.pitch,
-      bearing: sector.bearing,
-      essential: true,
-      duration: 1600,
-    });
-
-    onSectorChange?.(sector);
-  };
-
-  // Toggle basemap between Carto Dark Matter and OpenFreeMap Dark
-  const toggleBasemap = () => {
-    const nextKey = activeProviderKey === 'cartoDark' ? 'openFreeMapDark' : 'cartoDark';
-    setInternalProviderKey(nextKey);
-  };
-
-  // Reset camera to active sector
-  const resetCamera = () => {
-    if (!mapRef.current) return;
-    mapRef.current.easeTo({
-      pitch: 0,
-      bearing: 0,
-      duration: 600,
-    });
-  };
+  }, [interpolator]);
 
   return (
-    <div className="relative w-full h-full min-h-[500px] flex-1 bg-[#080b11] overflow-hidden select-none">
-      {/* MapLibre WebGL Canvas Container */}
-      <div
-        ref={containerRef}
-        id="aeroloom-flight-map"
-        className="absolute inset-0 w-full h-full"
-        style={{ background: '#080b11' }}
+    <div className={`relative w-full h-full overflow-hidden bg-[#F6F4EE] ${className}`}>
+      {/* MapLibre WebGL Canvas Container over paper background */}
+      <div ref={containerRef} className="w-full h-full bg-[#F6F4EE]" />
+
+      {/* Basemap unavailable notice with retry indicator */}
+      {basemapUnavailable && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+          <div className="px-3 py-1.5 rounded-[var(--r-sm)] bg-[var(--surface)]/95 backdrop-blur-sm border border-[var(--line)] shadow-[var(--sh-1)] flex items-center gap-2 font-mono text-xs text-[var(--ink-2)]">
+            <span className="w-2 h-2 rounded-full bg-[var(--warn)] animate-pulse" />
+            <span>Basemap unavailable, retrying...</span>
+          </div>
+        </div>
+      )}
+
+      {/* High-Precision Floating Hover Tag */}
+      <MapHoverTag
+        aircraft={hoveredAircraft}
+        x={hoverPos.x}
+        y={hoverPos.y}
+        visible={Boolean(hoveredAircraft)}
       />
 
-      {/* Loading Overlay */}
-      {isLoading && (
-        <div className="absolute inset-0 bg-[#080b11]/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0f141f] border border-[#1f293d] text-slate-200 font-mono text-xs shadow-xl">
-            <Loader2 className="w-4 h-4 text-sky-400 animate-spin" />
-            <span>INITIALIZING VECTOR BASEMAP ENGINE...</span>
-          </div>
-          <span className="text-[11px] font-mono text-slate-500">
-            {activeProvider.name} &bull; EPSG:3857 Web Mercator
-          </span>
-        </div>
-      )}
-
-      {/* Error Fallback State */}
-      {mapError && (
-        <div className="absolute inset-0 bg-[#080b11]/95 z-30 flex flex-col items-center justify-center p-6 text-center">
-          <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-900/60 max-w-md flex flex-col items-center gap-3">
-            <AlertCircle className="w-8 h-8 text-rose-400" />
-            <div>
-              <h3 className="text-sm font-semibold text-rose-200 font-mono">
-                BASEMAP ENGINE DISRUPTED
-              </h3>
-              <p className="text-xs text-rose-300/80 mt-1 font-mono">
-                {mapError}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <button
-                onClick={initMap}
-                className="px-3 py-1.5 rounded-lg bg-[#0f141f] border border-[#1f293d] text-xs font-mono text-slate-200 hover:text-white hover:border-sky-500 transition-colors flex items-center gap-1.5"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Retry Canvas
-              </button>
-              <button
-                onClick={toggleBasemap}
-                className="px-3 py-1.5 rounded-lg bg-sky-600/20 border border-sky-500/40 text-xs font-mono text-sky-300 hover:bg-sky-600/30 transition-colors flex items-center gap-1.5"
-              >
-                <Layers className="w-3.5 h-3.5" />
-                Switch to {activeProviderKey === 'cartoDark' ? 'OpenFreeMap' : 'CARTO'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Floating Tactical Telemetry Overlay (Bottom-Left) */}
-      <div className="absolute bottom-3 left-3 z-10 hidden sm:flex flex-col gap-1.5 pointer-events-none">
-        <div className="px-3 py-1.5 rounded-lg bg-[#0f141f]/90 border border-[#1f293d] backdrop-blur-md text-[11px] font-mono text-slate-300 flex items-center gap-3 shadow-lg pointer-events-auto">
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-500">POS:</span>
-            <span className="text-sky-300 font-semibold">
-              {Math.abs(mapMetrics.lat).toFixed(4)}°{mapMetrics.lat >= 0 ? 'N' : 'S'},{' '}
-              {Math.abs(mapMetrics.lng).toFixed(4)}°{mapMetrics.lng >= 0 ? 'E' : 'W'}
-            </span>
-          </div>
-
-          <div className="w-px h-3 bg-[#1f293d]" />
-
-          <div className="flex items-center gap-1.5">
-            <span className="text-slate-500">ZOOM:</span>
-            <span className="text-slate-200 font-semibold">{mapMetrics.zoom}x</span>
-          </div>
-
-          {mapMetrics.pitch > 0 && (
-            <>
-              <div className="w-px h-3 bg-[#1f293d]" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-500">PITCH:</span>
-                <span className="text-amber-400 font-semibold">{mapMetrics.pitch}°</span>
-              </div>
-            </>
-          )}
-
-          {mapMetrics.bearing !== 0 && (
-            <>
-              <div className="w-px h-3 bg-[#1f293d]" />
-              <div className="flex items-center gap-1.5">
-                <span className="text-slate-500">HDG:</span>
-                <span className="text-slate-200 font-semibold">
-                  {((mapMetrics.bearing % 360 + 360) % 360).toFixed(0).padStart(3, '0')}°
-                </span>
-              </div>
-            </>
-          )}
-
-          {(mapMetrics.pitch !== 0 || mapMetrics.bearing !== 0) && (
-            <button
-              onClick={resetCamera}
-              title="Reset 2D North-up View"
-              className="ml-1 p-0.5 rounded text-sky-400 hover:text-white hover:bg-sky-500/20 transition-colors pointer-events-auto"
-            >
-              <Compass className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Sector Label Pill */}
-        <div className="px-2.5 py-1 rounded bg-[#080b11]/80 border border-[#1f293d]/80 text-[10px] font-mono text-slate-400 max-w-fit">
-          SECTOR: <span className="text-slate-200 font-semibold">{activeSector.label}</span> ({activeSector.iata})
+      {/* Tasteful Custom Basemap Attribution */}
+      <div className="absolute bottom-2 left-4 md:left-20 z-10 pointer-events-none select-none">
+        <div className="bg-white/80 backdrop-blur-xs px-2 py-0.5 rounded text-[10px] font-mono text-[var(--ink-4)] border border-[var(--line)]">
+          Map © OpenFreeMap · Data © OpenStreetMap · Telemetry © Airplanes.live
         </div>
       </div>
-
-
-
-      {/* Basemap Attribution Bar (Bottom-Right, compliant with CARTO and OpenStreetMap) */}
-      <div className="absolute bottom-1 right-1 z-10 pointer-events-auto">
-        <div className="px-2 py-0.5 rounded bg-[#080b11]/85 border border-[#1f293d]/60 text-[9px] font-mono text-slate-500 flex items-center gap-1.5">
-          <span>{activeProvider.attribution}</span>
-        </div>
-      </div>
-
-      {/* Slot for Child Overlays / Live Aircraft Layer (Sprint 2) */}
-      {isMapReady && children && children(mapRef.current)}
     </div>
   );
 }
-
-export { AVIATION_SECTORS };
