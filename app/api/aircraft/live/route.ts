@@ -30,18 +30,18 @@ interface CachedPayload {
 }
 
 export async function GET(request: NextRequest) {
-  // 1. IP Rate Limiting (120 req / minute per client)
+  // 1. IP Rate Limiting (240 req / minute per client on live map feed)
   const clientIp =
     request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
     request.headers.get('x-real-ip') ||
     '127.0.0.1';
 
-  const rateCheck = globalRateLimiter.check(clientIp, 120, 60000);
+  const rateCheck = globalRateLimiter.check(`${clientIp}:live`, 240, 60000);
   if (!rateCheck.allowed) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
+        error: 'Rate limit exceeded (240 requests/minute). Please slow down.',
         timestamp: Date.now(),
         aircraft: [],
         states: [],

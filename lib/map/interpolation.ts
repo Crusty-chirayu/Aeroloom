@@ -65,7 +65,16 @@ export class AircraftInterpolator {
     const activeIds = new Set<string>();
 
     for (const ac of incoming) {
-      if (!ac.id || typeof ac.lat !== 'number' || typeof ac.lon !== 'number') continue;
+      if (
+        !ac.id ||
+        typeof ac.lat !== 'number' ||
+        typeof ac.lon !== 'number' ||
+        !Number.isFinite(ac.lat) ||
+        !Number.isFinite(ac.lon) ||
+        Math.abs(ac.lat) > 90
+      ) {
+        continue;
+      }
       activeIds.add(ac.id);
 
       const category = getAircraftCategory(ac.typeCode);
@@ -159,11 +168,19 @@ export class AircraftInterpolator {
 
         const rad = ((ac.currentTrack || 0) * Math.PI) / 180;
         const dLat = (distNm * Math.cos(rad)) / NM_PER_DEG_LAT;
-        const cosLat = Math.cos((ac.currentLat * Math.PI) / 180) || 1;
+        const cosLat = Math.max(0.01, Math.cos((Math.min(85, Math.max(-85, ac.currentLat)) * Math.PI) / 180));
         const dLng = (distNm * Math.sin(rad)) / (NM_PER_DEG_LAT * cosLat);
 
-        ac.currentLat += dLat;
-        ac.currentLng += dLng;
+        ac.currentLat = Math.max(-89.9, Math.min(89.9, ac.currentLat + dLat));
+        let nextLng = ac.currentLng + dLng;
+        nextLng = ((((nextLng + 180) % 360) + 360) % 360) - 180;
+        ac.currentLng = nextLng;
+      }
+
+      // Safety check: ensure coordinates never degenerate to NaN or non-finite numbers
+      if (!Number.isFinite(ac.currentLat) || !Number.isFinite(ac.currentLng)) {
+        ac.currentLat = ac.targetLat;
+        ac.currentLng = ac.targetLng;
       }
 
       // Determine visual state

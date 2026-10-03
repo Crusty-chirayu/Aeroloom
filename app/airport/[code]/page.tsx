@@ -36,6 +36,7 @@ export default function AirportDetailPage({ params }: AirportPageProps) {
 
   // Fetch METAR weather and nearby traffic
   const fetchAirportData = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
     if (!airport) return;
 
     // 1. Fetch weather

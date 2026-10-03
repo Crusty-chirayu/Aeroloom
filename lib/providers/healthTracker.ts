@@ -88,8 +88,8 @@ export function recordProviderFailure(
   health.lastError = errorMsg;
   health.consecutiveFailures += 1;
 
-  // Open circuit breaker after 3 consecutive failures or 403 Forbidden
-  if (health.consecutiveFailures >= 3 || httpStatus === 403) {
+  // Open circuit breaker after 3 consecutive failures, 403 Forbidden, or 429 Too Many Requests
+  if (health.consecutiveFailures >= 3 || httpStatus === 403 || httpStatus === 429) {
     health.circuitState = 'open';
     health.circuitOpenUntil = now + CIRCUIT_BREAKER_COOLDOWN_MS;
   }

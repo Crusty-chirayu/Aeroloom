@@ -13,18 +13,18 @@ export async function GET(
   request: NextRequest,
   context: RouteContext
 ) {
-  // IP Rate Limiting (120 req / minute per client)
+  // IP Rate Limiting (180 req / minute per client on this endpoint)
   const clientIp =
     request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
     request.headers.get('x-real-ip') ||
     '127.0.0.1';
 
-  const rateCheck = globalRateLimiter.check(clientIp, 120, 60000);
+  const rateCheck = globalRateLimiter.check(`${clientIp}:aircraft`, 180, 60000);
   if (!rateCheck.allowed) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
+        error: 'Rate limit exceeded (180 requests/minute). Please slow down.',
         timestamp: Date.now(),
       },
       {
@@ -54,13 +54,33 @@ export async function GET(
   const cacheKey = `aircraft_${cleanId.toLowerCase()}`;
   const cache = getCacheService();
 
-  // Check cache (TTL 6 seconds)
-  const cached = await cache.get<AircraftState>(cacheKey);
+  // Check cache (TTL 6 seconds for hit, 10 seconds for negative lookup)
+  const cached = await cache.get<AircraftState | { notFound: boolean }>(cacheKey);
   if (cached) {
+    if ('notFound' in cached && cached.notFound) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Aircraft with callsign or hex '${cleanId}' is not currently tracked as airborne.`,
+          airborne: false,
+          id: cleanId,
+          cached: true,
+          timestamp: Date.now(),
+        },
+        {
+          status: 404,
+          headers: {
+            'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=15',
+            'X-Data-Source': 'aeroloom-cache-neg',
+          },
+        }
+      );
+    }
+
     return NextResponse.json(
       {
         success: true,
-        aircraft: cached,
+        aircraft: cached as AircraftState,
         cached: true,
         timestamp: Date.now(),
       },
@@ -80,6 +100,9 @@ export async function GET(
     });
 
     if (!aircraft) {
+      // Cache negative lookup for 10 seconds to protect upstream providers from polling storms
+      await cache.set(cacheKey, { notFound: true }, 10);
+
       return NextResponse.json(
         {
           success: false,

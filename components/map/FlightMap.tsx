@@ -12,6 +12,16 @@ import type { MapFilters, MapLayers } from './MapControls';
 import { MapHoverTag } from './MapHoverTag';
 import { mapTypeCodeToCategory } from '@/lib/map/typeMapping';
 
+function clampLat(lat: number): number {
+  return Math.max(-89.9, Math.min(89.9, lat));
+}
+
+function normalizeLng(lng: number): number {
+  let val = ((lng + 180) % 360);
+  if (val < 0) val += 360;
+  return val - 180;
+}
+
 export interface FlightMapProps {
   interpolator: AircraftInterpolator;
   selectedAircraftId: string | null;
@@ -463,9 +473,9 @@ export function FlightMap({
     if (!map || !selectedAircraftId) return;
 
     const ac = interpolator.get(selectedAircraftId);
-    if (ac) {
+    if (ac && Number.isFinite(ac.raw.lat) && Number.isFinite(ac.raw.lon)) {
       map.easeTo({
-        center: [ac.raw.lon, ac.raw.lat],
+        center: [normalizeLng(ac.raw.lon), clampLat(ac.raw.lat)],
         duration: 800,
         padding: { right: window.innerWidth > 768 ? 420 : 0 },
       });
@@ -514,6 +524,16 @@ export function FlightMap({
             const shadowFeatures: GeoJSON.Feature[] = [];
 
             filtered.forEach((item) => {
+              if (
+                !Number.isFinite(item.currentLat) ||
+                !Number.isFinite(item.currentLng)
+              ) {
+                return;
+              }
+
+              const safeLat = clampLat(item.currentLat);
+              const safeLng = normalizeLng(item.currentLng);
+
               const ac = item.raw;
               const category = mapTypeCodeToCategory(ac.typeCode);
               const spriteId = getAircraftSpriteId(category, item.state);
@@ -522,7 +542,7 @@ export function FlightMap({
                 type: 'Feature',
                 geometry: {
                   type: 'Point',
-                  coordinates: [item.currentLng, item.currentLat],
+                  coordinates: [safeLng, safeLat],
                 },
                 properties: {
                   id: item.id,
@@ -539,12 +559,14 @@ export function FlightMap({
               const shadowSpriteId = getAircraftSpriteId(category, 'ground_shadow');
               const alt = ac.altitudeFt || 0;
               const offset = Math.min(0.025, (alt / 35000) * 0.015);
+              const shadowLat = clampLat(safeLat - offset);
+              const shadowLng = normalizeLng(safeLng + offset);
 
               shadowFeatures.push({
                 type: 'Feature',
                 geometry: {
                   type: 'Point',
-                  coordinates: [item.currentLng + offset, item.currentLat - offset],
+                  coordinates: [shadowLng, shadowLat],
                 },
                 properties: {
                   id: `${item.id}-shadow`,
@@ -556,7 +578,7 @@ export function FlightMap({
               // Camera follow lock
               if (currentFollow && currentSelectedId === item.id) {
                 map.easeTo({
-                  center: [item.currentLng, item.currentLat],
+                  center: [safeLng, safeLat],
                   duration: 0, // Direct lock
                 });
               }

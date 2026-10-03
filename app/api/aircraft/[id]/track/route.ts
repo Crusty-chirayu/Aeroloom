@@ -13,18 +13,18 @@ export async function GET(
   request: NextRequest,
   context: RouteContext
 ) {
-  // IP Rate Limiting (120 req / minute per client)
+  // IP Rate Limiting (180 req / minute per client on this endpoint)
   const clientIp =
     request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
     request.headers.get('x-real-ip') ||
     '127.0.0.1';
 
-  const rateCheck = globalRateLimiter.check(clientIp, 120, 60000);
+  const rateCheck = globalRateLimiter.check(`${clientIp}:track`, 180, 60000);
   if (!rateCheck.allowed) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Rate limit exceeded (120 requests/minute). Please slow down.',
+        error: 'Rate limit exceeded (180 requests/minute). Please slow down.',
         track: [],
         timestamp: Date.now(),
       },

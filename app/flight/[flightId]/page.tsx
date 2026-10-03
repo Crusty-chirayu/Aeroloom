@@ -31,6 +31,8 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
 
   // Fetch flight telemetry & track
   const fetchFlightData = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+
     try {
       // 1. Fetch live or recent state
       const res = await fetch(`/api/aircraft/${flightId}`);
@@ -66,12 +68,14 @@ export default function FlightDetailPage({ params }: FlightPageProps) {
     const timer = setTimeout(() => {
       fetchFlightData();
     }, 0);
-    const interval = setInterval(fetchFlightData, 8000);
+    // Poll every 10s if active, or slow down to 30s if not found
+    const intervalMs = errorStatus === 'not_found' ? 30000 : 10000;
+    const interval = setInterval(fetchFlightData, intervalMs);
     return () => {
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [fetchFlightData, flightId]);
+  }, [fetchFlightData, flightId, errorStatus]);
 
   const handleCopyLink = () => {
     if (typeof window !== 'undefined') {

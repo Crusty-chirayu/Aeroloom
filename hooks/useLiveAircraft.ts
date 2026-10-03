@@ -88,6 +88,23 @@ export function useLiveAircraft({
     });
   }, [selectedAircraftId, interpolator, aircraft]);
 
+  // Dynamic state refs to ensure stable fetch callback without re-triggering polling loops
+  const activeBoundsRef = useRef(activeBounds);
+  const activeZoomRef = useRef(activeZoom);
+  const sectorRef = useRef(sector);
+  const selectedAircraftIdRef = useRef(selectedAircraftId);
+  const enabledRef = useRef(enabled);
+  const aircraftRef = useRef(aircraft);
+
+  useEffect(() => {
+    activeBoundsRef.current = activeBounds;
+    activeZoomRef.current = activeZoom;
+    sectorRef.current = sector;
+    selectedAircraftIdRef.current = selectedAircraftId;
+    enabledRef.current = enabled;
+    aircraftRef.current = aircraft;
+  }, [activeBounds, activeZoom, sector, selectedAircraftId, enabled, aircraft]);
+
   // Set bounds callback with debounce
   const setBounds = useCallback((bounds: Bounds, currentZoom: number) => {
     setActiveBounds(bounds);
@@ -96,7 +113,7 @@ export function useLiveAircraft({
 
   // Fetch live aircraft data from server route
   const fetchAircraft = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabledRef.current) return;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -108,12 +125,17 @@ export function useLiveAircraft({
 
     try {
       let url = '/api/aircraft/live';
-      if (activeBounds) {
-        const { south, west, north, east } = activeBounds;
-        url += `?bounds=${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)}&zoom=${Math.round(activeZoom)}`;
-      } else if (sector) {
-        const [centerLng, centerLat] = sector.center;
-        const queryRadiusNm = sector.id === 'conus' ? 250 : 120;
+      const currentBounds = activeBoundsRef.current;
+      const currentZoom = activeZoomRef.current;
+      const currentSector = sectorRef.current;
+      const currentSelectedId = selectedAircraftIdRef.current;
+
+      if (currentBounds) {
+        const { south, west, north, east } = currentBounds;
+        url += `?bounds=${south.toFixed(4)},${west.toFixed(4)},${north.toFixed(4)},${east.toFixed(4)}&zoom=${Math.round(currentZoom)}`;
+      } else if (currentSector) {
+        const [centerLng, centerLat] = currentSector.center;
+        const queryRadiusNm = currentSector.id === 'conus' ? 250 : 120;
         url += `?lat=${centerLat.toFixed(4)}&lon=${centerLng.toFixed(4)}&radius=${queryRadiusNm}`;
       } else {
         url += `?lat=40.7128&lon=-74.0060&radius=120`;
@@ -175,12 +197,12 @@ export function useLiveAircraft({
       setIsRefreshing(false);
 
       // Keep selected aircraft updated if present
-      if (selectedAircraftId) {
-        const matched = receivedList.find((a) => a.id === selectedAircraftId);
+      if (currentSelectedId) {
+        const matched = receivedList.find((a) => a.id === currentSelectedId);
         if (matched) {
           setSelectedAircraft(matched);
         }
-        const trail = breadcrumbsMapRef.current.get(selectedAircraftId) || [];
+        const trail = breadcrumbsMapRef.current.get(currentSelectedId) || [];
         setSelectedTrail([...trail]);
       }
     } catch (err: unknown) {
@@ -194,7 +216,7 @@ export function useLiveAircraft({
       setIsDegraded(true);
 
       // Only show full error banner if 3+ consecutive failures AND no aircraft data to show
-      if (consecutiveFailuresRef.current >= 3 && aircraft.length === 0) {
+      if (consecutiveFailuresRef.current >= 3 && aircraftRef.current.length === 0) {
         setError('No live data source is reachable right now. Retrying…');
       } else {
         setError(null);
@@ -209,11 +231,16 @@ export function useLiveAircraft({
         }
       }, backoffMs);
     }
-  }, [enabled, activeBounds, activeZoom, sector, selectedAircraftId, interpolator, aircraft]);
+  }, [interpolator]);
 
   useEffect(() => {
     fetchAircraftRef.current = fetchAircraft;
   }, [fetchAircraft]);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchAircraftRef.current();
+  }, []);
 
   // Handle bounds or sector changes with debounce
   useEffect(() => {
@@ -222,20 +249,20 @@ export function useLiveAircraft({
     }
 
     debounceTimerRef.current = setTimeout(() => {
-      fetchAircraft();
+      fetchAircraftRef.current();
     }, DEBOUNCE_DELAY_MS);
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [fetchAircraft]);
+  }, [activeBounds, activeZoom, sector]);
 
   // Periodic polling interval
   useEffect(() => {
     isMountedRef.current = true;
 
     pollTimerRef.current = setInterval(() => {
-      fetchAircraft();
+      fetchAircraftRef.current();
     }, pollIntervalMs);
 
     return () => {
@@ -244,7 +271,7 @@ export function useLiveAircraft({
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       if (abortControllerRef.current) abortControllerRef.current.abort();
     };
-  }, [fetchAircraft, pollIntervalMs]);
+  }, [pollIntervalMs]);
 
   // Replay stub functions for full backward compatibility
   const startReplay = useCallback(() => {
