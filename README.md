@@ -51,7 +51,7 @@ Paper & ink, not phosphor & glass.
 
 <div align="center">
 <br />
-<img src="docs/assets/map.png" alt="Aeroloom live map" width="92%" />
+<img width="1906" height="936" alt="image" src="https://github.com/user-attachments/assets/b54f5c12-575c-47ad-812c-9b7fbf20bd15" />
 <br />
 <sub><i>The live map — thousands of aircraft on paper-toned vector cartography, gliding at 60 fps.</i></sub>
 <br />
