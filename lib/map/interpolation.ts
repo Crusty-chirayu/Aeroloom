@@ -278,4 +278,8 @@ export class AircraftInterpolator {
   public clear(): void {
     this.aircraftMap.clear();
   }
+
+  public get size(): number {
+    return this.aircraftMap.size;
+  }
 }

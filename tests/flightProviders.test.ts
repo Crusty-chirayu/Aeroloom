@@ -116,8 +116,10 @@ describe('Telemetry Providers & Failover Suite', () => {
     resetProviderHealthForTest();
   });
 
-  it('normalizes adsb.fi success response with aircraft array', async () => {
-    globalThis.fetch = (async () => {
+  it('normalizes adsb.fi success response with aircraft array and valid /lat/ and /lon/ URL', async () => {
+    let capturedUrl = '';
+    globalThis.fetch = (async (url: string | URL) => {
+      capturedUrl = String(url);
       return new Response(JSON.stringify(ADS_B_FI_SUCCESS_FIXTURE), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
@@ -127,6 +129,10 @@ describe('Telemetry Providers & Failover Suite', () => {
     try {
       const provider = new AdsbFiProvider();
       const aircraft = await provider.getAircraftInBounds(TEST_BOUNDS);
+      assert.ok(
+        capturedUrl.includes('/lat/') && capturedUrl.includes('/lon/') && capturedUrl.includes('/dist/'),
+        `adsb.fi URL must contain /lat/ and /lon/ structure, got: ${capturedUrl}`
+      );
       assert.strictEqual(aircraft.length, 1);
       assert.strictEqual(aircraft[0].id, 'a1435d');
       assert.strictEqual(aircraft[0].callsign, 'SWA1864');

@@ -6,7 +6,7 @@ export const AEROLOOM_USER_AGENT =
   process.env.AEROLOOM_USER_AGENT ||
   'Aeroloom/1.0 (+https://github.com/Crusty-chirayu/Aeroloom; contact: chirayujaysawal7@gmail.com)';
 
-export const PROVIDER_TIMEOUT_MS = 8000;
+export const PROVIDER_TIMEOUT_MS = 4000;
 export const CIRCUIT_BREAKER_COOLDOWN_MS = 60_000; // 60 seconds skip on failure
 
 export interface ProviderCredentials {

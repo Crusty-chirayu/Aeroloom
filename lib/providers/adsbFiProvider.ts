@@ -18,7 +18,7 @@ export class AdsbFiProvider implements FlightProvider {
   async getAircraftInBounds(bounds: Bounds): Promise<AircraftState[]> {
     const { lat, lon, radiusNm } = boundsToCenterRadius(bounds);
     const clampedRadius = Math.min(250, Math.max(10, radiusNm));
-    const url = `${this.baseUrl}/lat/${lat}/${lon}/dist/${clampedRadius}`;
+    const url = `${this.baseUrl}/lat/${lat}/lon/${lon}/dist/${clampedRadius}`;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);

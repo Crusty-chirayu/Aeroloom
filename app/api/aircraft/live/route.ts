@@ -259,6 +259,42 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // 6. Safe emergency synthetic fallback: if all upstream feeds fail and no cache is available, provide simulated traffic with degraded flag
+    try {
+      const sampleProvider = new SampleTrafficProvider();
+      const states = await sampleProvider.getAircraftInBounds(bounds);
+      const reqTime = Date.now();
+      const legacyAircraft = states.map((s) => ({
+        ...toAircraftPosition(s),
+        lat: s.lat,
+        lon: s.lon,
+      }));
+
+      const emergencyPayload: CachedPayload = {
+        success: true,
+        states,
+        aircraft: legacyAircraft,
+        totalFound: states.length,
+        timestamp: reqTime,
+        provider: 'sample-emergency-fallback',
+        isSampleData: true,
+        degraded: true,
+        warning: 'Live telemetry delayed; displaying estimated airspace sector traffic',
+      };
+
+      await cache.set(cacheKey, emergencyPayload, POSITIVE_CACHE_TTL_SEC);
+
+      return NextResponse.json(emergencyPayload, {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Aeroloom-Degraded': 'true',
+        },
+      });
+    } catch {
+      // Fall through to 502 error payload if sample generation also fails
+    }
+
     // Negative cache to protect upstream
     const failedPayload: CachedPayload = {
       success: false,

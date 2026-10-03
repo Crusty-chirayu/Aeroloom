@@ -56,6 +56,7 @@ function MapViewContent() {
     aircraft,
     totalCount,
     isLoading,
+    isRefreshing,
     isStale,
     isDegraded,
     isSampleData,
@@ -343,8 +344,8 @@ function MapViewContent() {
           </div>
         )}
 
-        {/* Empty Airspace Notice */}
-        {!isLoading && aircraft.length === 0 && !error && (
+        {/* Empty Airspace Notice (only when successfully confirmed empty, non-delayed, non-stale) */}
+        {!isLoading && !isRefreshing && !isDegraded && !isStale && !error && aircraft.length === 0 && (!interpolator || interpolator.size === 0) && (
           <div className="pointer-events-auto bg-white/95 border border-[var(--line)] px-4 py-3 rounded-sm shadow-md text-xs font-mono text-[var(--ink-2)] animate-in fade-in">
             <p className="font-semibold text-[var(--ink)]">No Airborne Contacts in View</p>
             <p className="text-[11px] text-[var(--ink-3)] mt-0.5">
